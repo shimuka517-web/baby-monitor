@@ -1,0 +1,17 @@
+# scripts/install-service.sh が __USER__ と __DIR__ を置き換えて
+# /etc/systemd/system/baby-monitor.service に配置します（手で編集する必要はありません）。
+[Unit]
+Description=Baby monitor camera (face detection + streaming)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__DIR__
+ExecStart=__DIR__/venv/bin/python __DIR__/baby_monitor.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

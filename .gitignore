@@ -1,0 +1,13 @@
+# 秘密情報（Discord URL・Gmailパスワード）は絶対にコミットしない
+config/secrets.toml
+
+# 環境ごとに作るもの
+venv/
+models/*.onnx
+__pycache__/
+*.pyc
+
+# テスト撮影・スナップショット
+*.jpg
+*.png
+!docs/images/*.png
