@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ミルクの記録</title>
+<style>
+  :root {
+    --bg: #F4F2EC; --ink: #1D2430; --sub: #4A5363; --line: #C9C4B8;
+    --card: #FFFFFF; --blue: #1F5FB8; --blue-ink: #12304F; --blue-bg: #E4EEFA;
+    --ok-bg: #E7F4EC; --ok-ink: #155C3A; --warn-bg: #FFF3D6; --warn-ink: #6B4A00;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font-family: "Noto Sans JP", "Noto Sans CJK JP", "Hiragino Sans", sans-serif;
+    -webkit-tap-highlight-color: transparent; user-select: none; }
+  button, a { font-family: inherit; touch-action: manipulation; }
+  .page { min-height: 100%; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 20px; padding: 14px 28px; }
+  .back { height: 64px; padding: 0 24px 0 16px; border-radius: 18px; border: 2px solid var(--ink);
+    background: var(--card); color: var(--ink); text-decoration: none; font-size: 24px; font-weight: 700;
+    display: flex; align-items: center; gap: 8px; }
+  h1 { margin: 0; font-size: 36px; font-weight: 900; }
+  #clock { margin-left: auto; font-size: 30px; font-weight: 700; }
+  main { flex: 1; display: flex; gap: 24px; padding: 0 28px 28px; flex-wrap: wrap; }
+  .entry { flex: 999 1 560px; min-width: 0; background: var(--card); border-radius: 24px;
+    padding: 26px 34px; display: flex; flex-direction: column; gap: 18px; }
+  .label { font-size: 26px; font-weight: 700; color: var(--sub); }
+  .stepper { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .round { width: 150px; height: 150px; flex: none; border-radius: 75px; border: 3px solid var(--ink);
+    background: var(--card); color: var(--ink); display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 2px; font-size: 20px; font-weight: 700; cursor: pointer; }
+  .round.plus { background: var(--ink); color: #fff; }
+  .round:active { transform: scale(0.96); }
+  .amount { display: flex; align-items: baseline; gap: 8px; }
+  #amount { font-size: 168px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+  .unit { font-size: 48px; font-weight: 700; }
+  .presets { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+  .preset { height: 72px; border-radius: 16px; border: 2px solid var(--line); background: var(--bg);
+    color: var(--ink); font-size: 26px; font-weight: 700; cursor: pointer; }
+  .preset.on { background: var(--ink); color: #fff; border: 3px solid var(--ink); }
+  #record { margin-top: auto; min-height: 112px; border: 0; border-radius: 24px; background: var(--blue);
+    color: #fff; font-size: 36px; font-weight: 900; display: flex; align-items: center; justify-content: center;
+    gap: 14px; cursor: pointer; }
+  #record:disabled { opacity: 0.6; }
+  .side { flex: 1 1 300px; background: var(--blue-bg); color: var(--blue-ink); border-radius: 24px;
+    padding: 26px; display: flex; flex-direction: column; gap: 8px; }
+  .side .k { font-size: 22px; font-weight: 700; }
+  .big { font-size: 54px; font-weight: 900; line-height: 1.1; }
+  .mid { font-size: 40px; font-weight: 900; line-height: 1.1; }
+  .mid small { font-size: 22px; font-weight: 700; }
+  .rule { height: 2px; background: #B9CCE6; margin: 8px 0; }
+  .list { display: flex; flex-direction: column; gap: 6px; font-size: 21px; margin-top: 4px; }
+  .list div { display: flex; justify-content: space-between; }
+  .list b { font-weight: 700; }
+  #sync { margin-top: auto; font-size: 17px; padding: 8px 12px; border-radius: 12px; }
+  #sync.ok { background: var(--ok-bg); color: var(--ok-ink); }
+  #sync.warn { background: var(--warn-bg); color: var(--warn-ink); }
+  #err { display: none; margin: 0 28px 16px; padding: 12px 16px; border-radius: 12px; background: #FDE2DE; color: #8E1F12; font-size: 20px; font-weight: 700; }
+  /* 記録した直後 */
+  #done { position: fixed; inset: 0; background: rgba(60,56,50,0.6); display: none; align-items: center; justify-content: center; padding: 16px; }
+  #done.show { display: flex; }
+  .dcard { width: min(760px, 100%); background: var(--card); border-radius: 32px; padding: 40px 44px 34px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+  .dtitle { font-size: 50px; font-weight: 900; line-height: 1.2; }
+  .dtime { font-size: 28px; font-weight: 500; color: var(--sub); }
+  .chip { display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px; font-size: 20px; font-weight: 700; }
+  .dbtns { width: 100%; margin-top: 14px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .dbtns button, .dbtns a { min-height: 100px; border-radius: 22px; font-size: 28px; font-weight: 700; display: flex;
+    flex-direction: column; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; }
+  #undo { border: 3px solid var(--ink); background: var(--card); color: var(--ink); }
+  #undo small { font-size: 18px; font-weight: 500; color: var(--sub); }
+  #undo:disabled { opacity: 0.4; }
+  #home { background: var(--ink); color: #fff; border: 0; }
+  .dnote { font-size: 18px; color: var(--sub); line-height: 1.5; }
+  @media (max-width: 760px) {
+    header { padding: 12px 16px; gap: 12px; } main { padding: 0 16px 16px; }
+    .back { height: 52px; padding: 0 14px 0 8px; font-size: 20px; white-space: nowrap; }
+    h1 { font-size: 26px; white-space: nowrap; } #clock { font-size: 22px; } .entry { padding: 18px; }
+    .stepper { gap: 6px; }
+    .round { width: 76px; height: 76px; font-size: 15px; } .round svg { width: 34px; height: 34px; }
+    #amount { font-size: 84px; } .unit { font-size: 28px; }
+    .presets { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    #record { font-size: 28px; min-height: 88px; } .dtitle { font-size: 34px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <a class="back" href="/">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>戻る</a>
+    <h1>ミルクの記録</h1>
+    <div id="clock">--:--</div>
+  </header>
+  <div id="err" role="alert"></div>
+  <main>
+    <section class="entry" aria-label="あげた量">
+      <div class="label">あげた量</div>
+      <div class="stepper">
+        <button class="round" id="minus" aria-label="減らす">
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg>
+          <span class="steplabel">10ml</span></button>
+        <div class="amount" aria-live="polite"><span id="amount">100</span><span class="unit">ml</span></div>
+        <button class="round plus" id="plus" aria-label="増やす">
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          <span class="steplabel">10ml</span></button>
+      </div>
+      <div class="presets" id="presets"></div>
+      <button id="record">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+        <span id="recordlabel">100ml を記録する</span></button>
+    </section>
+    <aside class="side">
+      <div class="k">前回から</div>
+      <div class="big" id="ago">記録なし</div>
+      <div id="lastline" style="font-size:20px"></div>
+      <div class="rule"></div>
+      <div class="k">今日の合計</div>
+      <div class="mid"><span id="total">0</span>ml<small id="count">（0回）</small></div>
+      <div class="list" id="recent"></div>
+      <div id="sync"></div>
+    </aside>
+  </main>
+</div>
+
+<div id="done" role="dialog" aria-modal="true" aria-labelledby="dtitle">
+  <div class="dcard">
+    <svg width="96" height="96" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#1F5FB8"/><path d="m7 12.5 3.2 3.2L17 8.8" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="dtitle" id="dtitle"></div>
+    <div class="dtime" id="dtime"></div>
+    <div class="chip" id="dsync"></div>
+    <div class="dbtns">
+      <button id="undo">取り消す<small id="undoleft"></small></button>
+      <a id="home" href="/">メイン画面へ</a>
+    </div>
+    <div class="dnote">ネットにつながっていないときは、つながってから送ります。<br>しばらくすると自動でメイン画面に戻ります。</div>
+  </div>
+</div>
+
+<script>
+let cfg = { default_ml: 100, step_ml: 10, max_ml: 300, presets: [40, 60, 80, 100, 120, 160], undo_sec: 10 };
+let amount = null, lastRec = null, timers = [];
+const $ = (id) => document.getElementById(id);
+
+function showErr(msg) { const e = $('err'); e.textContent = msg; e.style.display = msg ? 'block' : 'none'; }
+function setAmount(v) {
+  amount = Math.max(cfg.step_ml, Math.min(cfg.max_ml, v));
+  $('amount').textContent = amount;
+  $('recordlabel').textContent = amount + 'ml を記録する';
+  document.querySelectorAll('.preset').forEach((b) => b.classList.toggle('on', +b.dataset.v === amount));
+}
+function buildPresets() {
+  const box = $('presets'); box.innerHTML = '';
+  cfg.presets.forEach((v) => {
+    const b = document.createElement('button');
+    b.className = 'preset'; b.dataset.v = v; b.textContent = v + 'ml';
+    b.onclick = () => setAmount(v);
+    box.appendChild(b);
+  });
+  document.querySelectorAll('.steplabel').forEach((s) => s.textContent = cfg.step_ml + 'ml');
+}
+function render(st) {
+  if (st.config) {
+    const first = amount === null;
+    cfg = st.config; buildPresets();
+    setAmount(first ? (st.last ? st.last.amount : cfg.default_ml) : amount);
+  }
+  $('ago').textContent = st.last ? st.last.ago_text.replace(/前$/, '') : '記録なし';
+  $('lastline').textContent = st.last ? '前回 ' + st.last.time + '・' + st.last.amount + 'ml' : '';
+  $('total').textContent = st.today_total;
+  $('count').textContent = '（' + st.today_count + '回）';
+  $('recent').innerHTML = st.recent.map((r) => '<div><span>' + r.time + '</span><b>' + r.amount + 'ml</b></div>').join('');
+  const s = $('sync');
+  if (!st.sync_enabled) { s.className = 'warn'; s.textContent = 'ラズパイ内に保存中（共有シートは未設定）'; }
+  else if (st.pending > 0) { s.className = 'warn'; s.textContent = '共有シートへ未送信 ' + st.pending + '件（自動で再送します）'; }
+  else { s.className = 'ok'; s.textContent = '共有シートと同期済み'; }
+}
+async function refresh() {
+  try { const r = await fetch('/api/milk'); render(await r.json()); showErr(''); }
+  catch (e) { showErr('見守りカメラと通信できません'); }
+}
+async function post(path, body) {
+  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!r.ok || !j.ok) throw new Error(j.error || '記録できませんでした');
+  return j;
+}
+function clearTimers() { timers.forEach(clearInterval); timers.forEach(clearTimeout); timers = []; }
+
+$('minus').onclick = () => setAmount(amount - cfg.step_ml);
+$('plus').onclick = () => setAmount(amount + cfg.step_ml);
+$('record').onclick = async () => {
+  const btn = $('record'); btn.disabled = true;
+  try {
+    const j = await post('/api/milk', { amount: amount });
+    lastRec = j.record; render(j); showDone(j);
+  } catch (e) { showErr(e.message); }
+  finally { btn.disabled = false; }
+};
+function showDone(j) {
+  const t = new Date(j.record.ts);
+  $('dtitle').textContent = j.record.amount + 'ml を記録しました';
+  $('dtime').textContent = (t.getMonth() + 1) + '月' + t.getDate() + '日 ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+  const ds = $('dsync');
+  if (!j.sync_enabled) { ds.style.background = 'var(--warn-bg)'; ds.style.color = 'var(--warn-ink)'; ds.textContent = 'ラズパイ内に保存しました'; }
+  else { ds.style.background = 'var(--ok-bg)'; ds.style.color = 'var(--ok-ink)'; ds.textContent = '共有シートに送ります'; }
+  $('done').classList.add('show');
+  let left = cfg.undo_sec; const u = $('undo'); u.disabled = false;
+  $('undoleft').textContent = 'あと ' + left + ' 秒';
+  clearTimers();
+  timers.push(setInterval(() => {
+    left -= 1;
+    if (left <= 0) { u.disabled = true; $('undoleft').textContent = ''; } else { $('undoleft').textContent = 'あと ' + left + ' 秒'; }
+  }, 1000));
+  timers.push(setTimeout(() => { location.href = '/'; }, Math.max(10, cfg.undo_sec + 2) * 1000));
+}
+$('undo').onclick = async () => {
+  if (!lastRec) return;
+  clearTimers();
+  try { const j = await post('/api/milk/undo', { id: lastRec.id }); render(j); setAmount(lastRec.amount); }
+  catch (e) { showErr(e.message); }
+  $('done').classList.remove('show'); lastRec = null;
+};
+function tick() { const d = new Date(); $('clock').textContent = d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); }
+tick(); setInterval(tick, 10000);
+refresh(); setInterval(refresh, 30000);
+</script>
+</body>
+</html>

@@ -3,6 +3,7 @@ config/secrets.toml
 
 # 環境ごとに作るもの
 venv/
+data/
 models/*.onnx
 __pycache__/
 *.pyc

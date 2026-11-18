@@ -58,12 +58,17 @@ DEFAULTS = {
     "detection": {"score_threshold": 0.6, "try_rotations": True, "detect_width": 640},
     "camera": {"width": 1280, "height": 720, "rotate": 0},
     "web": {"port": 8000, "jpeg_quality": 80},
+    "milk": {"default_ml": 100, "step_ml": 10, "max_ml": 300,
+             "presets": [40, 60, 80, 100, 120, 160], "undo_sec": 10},
 }
 SECRET_DEFAULTS = {
     "discord": {"webhook_url": ""},
     "gmail": {"user": "", "app_password": "", "to": []},
     "web": {"user": "", "password": ""},
+    "sheets": {"gas_url": "", "token": ""},
 }
+DATA_DIR = os.environ.get("BABY_MONITOR_DATA_DIR", os.path.join(BASE_DIR, "data"))
+WEB_DIR = os.path.join(BASE_DIR, "web")
 
 
 def _merge(defaults, loaded, where):
@@ -326,6 +331,19 @@ class Shared:
 
 
 shared = Shared()
+MILK = None   # milk.MilkLog（main() で用意）
+
+
+def init_milk():
+    """ミルク記録を用意する（スプレッドシートの設定があれば送信も開始）"""
+    global MILK
+    from milk import MilkLog, make_gas_sender
+    sh = cfg.secrets["sheets"]
+    sender = make_gas_sender(sh["gas_url"], sh["token"]) if sh["gas_url"] else None
+    MILK = MilkLog(os.path.join(DATA_DIR, "milk.db"), sender=sender)
+    MILK.start_sync_thread()
+    log.info("ミルク記録: %s", "スプレッドシートへ送信します" if sender else "ラズパイ内にだけ保存します（送信先未設定）")
+    return MILK
 
 
 # ================================================================ Web配信
@@ -344,16 +362,26 @@ PAGE = """<!doctype html>
  #st{flex:1}
  .ng{color:#ff5252;font-weight:bold}.ok{color:#69f0ae}.wait{color:#ffd740}.gray{color:#aaa}
  button{font-size:16px;padding:6px 14px}
+ #milk{display:flex;flex-direction:column;justify-content:center;min-height:56px;padding:4px 18px;border-radius:14px;background:#E4EEFA;color:#12407E;text-decoration:none;font-weight:700;font-size:22px;line-height:1.2}
+ #milk small{font-size:14px;font-weight:500}
 </style></head><body>
 <div id="wrap">
  <div id="video"><img src="/stream.mjpg" alt="stream"></div>
  <div id="bar">
   <span id="st">接続中…</span>
+  <a id="milk" href="/milk">ミルク<small id="milklast">記録なし</small></a>
   <button onclick="setArm(true)">見守り開始</button>
   <button onclick="setArm(false)">一時停止</button>
  </div>
 </div>
 <script>
+async function pollMilk(){
+ try{
+  const m=await (await fetch('/api/milk')).json();
+  document.getElementById('milklast').textContent=m.last?('前回 '+m.last.ago_text+'・'+m.last.amount+'ml'):'記録なし';
+ }catch(e){}
+}
+setInterval(pollMilk,30000);pollMilk();
 async function setArm(on){await fetch(on?'/arm':'/disarm',{method:'POST'});setTimeout(poll,300);}
 async function poll(){
  try{
@@ -409,6 +437,11 @@ class Handler(server.BaseHTTPRequestHandler):
             with shared.lock:
                 body = json.dumps(shared.status).encode()
             self._send(200, "application/json", body)
+        elif self.path == "/milk":
+            with open(os.path.join(WEB_DIR, "milk.html"), "rb") as f:
+                self._send(200, "text/html; charset=utf-8", f.read())
+        elif self.path == "/api/milk":
+            self._json(200, self._milk_state())
         elif self.path == "/snapshot.jpg":
             jpeg = shared.jpeg
             if jpeg:
@@ -444,8 +477,29 @@ class Handler(server.BaseHTTPRequestHandler):
             with shared.lock:
                 shared.arm_request = armed
             self._send(200, "application/json", json.dumps({"armed": armed}).encode())
+        elif self.path in ("/api/milk", "/api/milk/undo"):
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(n) or b"{}")
+                if self.path == "/api/milk":
+                    rec = MILK.add(body.get("amount", 0), kind=body.get("kind", "ミルク"),
+                                   source=body.get("source", "ベッド横の画面"))
+                    self._json(200, {"ok": True, "record": rec, **self._milk_state()})
+                else:
+                    MILK.undo(str(body.get("id", "")))
+                    self._json(200, {"ok": True, **self._milk_state()})
+            except (ValueError, KeyError, TypeError) as e:
+                self._json(400, {"ok": False, "error": str(e).strip("'\"")})
         else:
             self._send(404, "text/plain", b"not found")
+
+    def _json(self, code, obj):
+        self._send(code, "application/json; charset=utf-8", json.dumps(obj, ensure_ascii=False).encode())
+
+    def _milk_state(self):
+        st = MILK.summary()
+        st["config"] = cfg.s["milk"]
+        return st
 
 
 class StreamingServer(ThreadingMixIn, server.HTTPServer):
@@ -516,6 +570,7 @@ def main():
     picam2.start()
     time.sleep(1.0)
 
+    init_milk()
     httpd = StreamingServer(("", web_cfg["port"]), Handler)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     log.info("配信開始: http://<ラズパイのIP>:%d/", web_cfg["port"])

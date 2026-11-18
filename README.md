@@ -5,6 +5,7 @@ Raspberry Pi 4 とラズパイ用カメラで作る、自作の見守りカメ�
 - 赤ちゃんの顔を常に検出し、**顔が見えなくなったら**（寝返り・うつ伏せなど）Discord と Gmail に写真付きで通知します
 - 別の部屋のPC・タブレット・テレビのブラウザに、ライブ映像と見守りの状態を表示します
 - 顔を検出しているときは**緑の枠**、見えなくなると**赤の枠**で表示します
+- **ミルクの記録**：あげた量と時刻をボタンで記録し、Googleスプレッドシートで家族と共有できます
 
 > ⚠️ **これは自作の補助ツールで、医療機器ではありません。** 見逃し（通知が来ない）も誤報も起こります。「顔が見えている＝呼吸に問題がない」という意味でもありません。安全な寝かせ方（仰向け寝・固めの寝具・顔まわりに物を置かない）を前提に、大人が様子を見る手段の一つとして使ってください。カメラとケーブルは赤ちゃんの手が絶対に届かない場所に固定してください。
 
@@ -18,6 +19,7 @@ Raspberry Pi 4 とラズパイ用カメラで作る、自作の見守りカメ�
 | ゼロから組み立てて設置したい | [docs/setup.md](docs/setup.md)（セットアップ手順） |
 | Discord / Gmail の通知を設定したい | [docs/notifications.md](docs/notifications.md) |
 | 毎日の使い方・アラートが来たときの対応 | [docs/usage.md](docs/usage.md) |
+| ミルクの記録・スプレッドシート連携 | [docs/milk.md](docs/milk.md) |
 | 通知が多すぎる／少なすぎるので調整したい | [docs/tuning.md](docs/tuning.md) |
 | エラーが出た・うまく動かない | [docs/troubleshooting.md](docs/troubleshooting.md) |
 | カメラマウントを3Dプリントしたい | [hardware/README.md](hardware/README.md) |
@@ -42,10 +44,13 @@ Raspberry Pi 4 とラズパイ用カメラで作る、自作の見守りカメ�
 baby-monitor/
 ├── README.md                     このページ（入口）
 ├── baby_monitor.py               プログラム本体（カメラ・顔検出・判定・通知・Web配信）
+├── milk.py                       ミルクの記録（ラズパイ内に保存・スプレッドシートへ送信）
+├── web/milk.html                 ミルクの記録画面
+├── gas/milk_sheet.gs             スプレッドシート側のスクリプト（Google Apps Script）
 ├── requirements.txt              必要な Python ライブラリ
 ├── config/                       ★ 利用者が触るのはここだけ
 │   ├── settings.toml             調整用の設定（秒数・検出の感度など）。保存すると自動反映
-│   ├── secrets.example.toml      通知先・パスワードのひな形
+│   ├── secrets.example.toml      通知先・パスワード・スプレッドシートURLのひな形
 │   └── secrets.toml              ↑をコピーして作る本物（GitHubには上がらない）
 ├── scripts/
 │   ├── install.sh                セットアップを自動で行う
@@ -53,8 +58,10 @@ baby-monitor/
 ├── systemd/
 │   └── baby-monitor.service.template   自動起動の設定のひな形（install-service.sh が使う）
 ├── models/                       顔検出モデルの置き場（install.sh がダウンロード）
+├── data/                         ミルクの記録など（自動で作られる。GitHubには上がらない）
 ├── tests/
-│   └── test_monitor.py           見守り判定のテスト（カメラ不要）
+│   ├── test_monitor.py           見守り判定のテスト（カメラ不要）
+│   └── test_milk.py              ミルク記録のテスト
 ├── hardware/                     カメラマウントの3Dプリント用データ
 └── docs/                         説明書
 ```
