@@ -59,8 +59,8 @@ function setup() {
   if (!sum) sum = ss.insertSheet(SUMMARY_NAME);
   sum.clear();
   sum.getRange('A1').setFormula(
-    "=QUERY(" + SHEET_NAME + "!A:C,\"select toDate(A), sum(B), count(B) where A is not null and C = 'ミルク' " +
-    "group by toDate(A) order by toDate(A) desc label toDate(A) '日付', sum(B) '合計(ml)', count(B) '回数' format toDate(A) 'yyyy/MM/dd'\",1)");
+    "=IFERROR(QUERY('" + SHEET_NAME + "'!A:C,\"select toDate(A), sum(B), count(B) where A is not null and C = 'ミルク' " +
+    "group by toDate(A) order by toDate(A) desc label toDate(A) '日付', sum(B) '合計(ml)', count(B) '回数' format toDate(A) 'yyyy/MM/dd'\",1),\"まだ記録がありません\")");
   sum.setColumnWidth(1, 120);
 }
 
