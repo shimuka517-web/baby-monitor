@@ -31,6 +31,7 @@ from http import server
 from socketserver import ThreadingMixIn
 
 import cv2
+import numpy as np
 import requests
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -387,6 +388,7 @@ async function poll(){
  try{
   const s=await (await fetch('/status')).json();
   let t='';
+  if(s.phase==='NO_CAMERA'){document.getElementById('st').innerHTML='<span class="wait">カメラが見つかりません（接続を確認してください）</span>';return;}
   if(s.phase==='PAUSED') t='<span class="gray">一時停止中</span>';
   else if(s.phase==='WAITING') t='<span class="wait">顔の確認待ち（'+s.confirm_progress+' / '+s.confirm_sec+'秒）</span>';
   else if(s.phase==='WATCHING') t=s.face_visible?'<span class="ok">見守り中・顔OK</span>'
@@ -558,22 +560,57 @@ def draw_overlay(frame, box, visible, mon, now, a):
 ROTATE_CODES = {90: cv2.ROTATE_90_CLOCKWISE, 180: cv2.ROTATE_180, 270: cv2.ROTATE_90_COUNTERCLOCKWISE}
 
 
+CAMERA_RETRY_SEC = 15
+
+
+def no_camera_jpeg(w, h):
+    """カメラが見つからないときに配信する案内画像"""
+    img = np.zeros((h, w, 3), np.uint8)
+    put_label(img, "CAMERA NOT FOUND", (24, h // 2 - 10), YELLOW, 1.2)
+    put_label(img, f"retrying every {CAMERA_RETRY_SEC}s", (24, h // 2 + 40), WHITE, 0.8)
+    ok, buf = cv2.imencode(".jpg", img)
+    return buf.tobytes() if ok else None
+
+
+def open_camera(Picamera2, cam_cfg):
+    """カメラが見つかるまで待つ（見つからない間もWeb画面とミルク記録は使える）"""
+    notified = False
+    placeholder = no_camera_jpeg(cam_cfg["width"], cam_cfg["height"])
+    while True:
+        try:
+            picam2 = Picamera2()
+            picam2.configure(picam2.create_video_configuration(
+                main={"size": (cam_cfg["width"], cam_cfg["height"]), "format": "RGB888"}))  # メモリ上は B,G,R 順
+            picam2.start()
+            time.sleep(1.0)
+            if notified:
+                log.info("カメラが見つかりました")
+            return picam2
+        except Exception as e:
+            if not notified:
+                log.warning("カメラが見つかりません（%s）。%d秒ごとに探します", e, CAMERA_RETRY_SEC)
+                notify("📷 カメラが見つかりません。接続を確認してください（見つかり次第、自動で見守りを始めます）。")
+                notified = True
+            with shared.lock:
+                shared.status = {"phase": "NO_CAMERA"}
+            if placeholder:
+                shared.set_jpeg(placeholder)
+            time.sleep(CAMERA_RETRY_SEC)
+
+
 def main():
     from picamera2 import Picamera2  # ラズパイ上でのみ import
 
     cam_cfg, web_cfg = cfg.s["camera"], cfg.s["web"]
     detector = FaceDetector(MODEL_PATH, cfg.detection["score_threshold"])
 
-    picam2 = Picamera2()
-    picam2.configure(picam2.create_video_configuration(
-        main={"size": (cam_cfg["width"], cam_cfg["height"]), "format": "RGB888"}))  # メモリ上は B,G,R 順
-    picam2.start()
-    time.sleep(1.0)
-
+    # 先にWeb画面とミルク記録を始める（カメラがなくても使えるように）
     init_milk()
     httpd = StreamingServer(("", web_cfg["port"]), Handler)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     log.info("配信開始: http://<ラズパイのIP>:%d/", web_cfg["port"])
+
+    picam2 = open_camera(Picamera2, cam_cfg)
 
     mon = Monitor(cfg.alert["armed_on_start"], time.monotonic())
     notify(f"見守りカメラを起動しました（{PHASE_JA[mon.phase]}）")
