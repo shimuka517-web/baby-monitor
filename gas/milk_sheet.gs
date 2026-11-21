@@ -61,6 +61,7 @@ function setup() {
   sum.getRange('A1').setFormula(
     "=IFERROR(QUERY('" + SHEET_NAME + "'!A:C,\"select toDate(A), sum(B), count(B) where A is not null and C = 'ミルク' " +
     "group by toDate(A) order by toDate(A) desc label toDate(A) '日付', sum(B) '合計(ml)', count(B) '回数' format toDate(A) 'yyyy/MM/dd'\",1),\"まだ記録がありません\")");
+  sum.getRange('A2:A').setNumberFormat('yyyy/MM/dd');   // 日付が数字で出ないように
   sum.setColumnWidth(1, 120);
 }
 
