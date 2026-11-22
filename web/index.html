@@ -39,25 +39,33 @@
   .badge.head { right: 24px; bottom: 24px; border-radius: 12px; font-size: 18px; color: #E6EAF0; }
   .side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
 
-  .card { flex: 1; min-height: 0; border-radius: 24px; padding: 32px; display: flex; flex-direction: column; gap: 12px;
+  .card { flex: none; border-radius: 24px; padding: 20px 24px; display: flex; align-items: center; gap: 18px;
     background: var(--ok); color: #fff; }
-  .card .big { font-size: 56px; font-weight: 900; line-height: 1.1; }
-  .card .msg { font-size: 26px; font-weight: 500; line-height: 1.45; }
-  .card .foot { margin-top: auto; font-size: 20px; line-height: 1.5; }
-  .card .foot b { display: block; font-size: 30px; font-weight: 700; }
+  .card .cicon { width: 60px; height: 60px; }
+  .card .ctext { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .card .big { font-size: 38px; font-weight: 900; line-height: 1.15; }
+  .card .msg { font-size: 20px; font-weight: 500; line-height: 1.4; }
+  .card.full { flex: 1; flex-direction: column; align-items: flex-start; justify-content: center; }
   .card.wait { background: var(--wait); color: var(--wait-ink); }
   .card.warn { background: var(--warn); }
   .card.gray { background: #5A6372; }
-  .bar { height: 22px; border-radius: 11px; background: rgba(42,31,0,0.18); overflow: hidden; }
+  .bar { height: 14px; margin-top: 4px; border-radius: 7px; background: rgba(42,31,0,0.18); overflow: hidden; }
   .bar div { height: 100%; border-radius: 11px; background: var(--wait-ink); transition: width .4s; }
   .count { font-size: 30px; font-weight: 700; }
 
-  .milk { height: 112px; flex: none; border-radius: 22px; border: 3px solid var(--blue); background: var(--blue-bg);
-    color: var(--blue-ink); text-decoration: none; padding: 0 22px; display: flex; align-items: center; gap: 16px; }
-  .milk .t { font-size: 32px; font-weight: 900; line-height: 1.1; }
-  .milk .s { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .milk { flex: 1; min-height: 0; border-radius: 24px; border: 3px solid var(--blue); background: var(--blue-bg);
+    color: var(--blue-ink); text-decoration: none; padding: 20px 26px; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
   .milk.feeding { border-color: #C26A00; background: #FFF1DE; color: #7A4300; }
-  .milk .s { font-size: 18px; font-weight: 500; }
+  .mtop { display: flex; align-items: center; gap: 10px; font-size: 26px; font-weight: 900; }
+  .mtop svg { width: 34px; height: 34px; }
+  .mtop .go { margin-left: auto; font-size: 18px; font-weight: 700; padding: 6px 14px; border-radius: 999px; background: rgba(255,255,255,.75); white-space: nowrap; }
+  .mlabel { margin-top: 6px; font-size: 22px; font-weight: 700; }
+  .mbig { font-size: 40px; font-weight: 900; line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .mbig b { font-size: 104px; font-weight: 900; }
+  .msub { margin-top: 6px; font-size: 20px; font-weight: 500; line-height: 1.45; }
+  .mfoot { margin-top: auto; padding-top: 10px; border-top: 2px solid rgba(18,64,126,.18); font-size: 22px; font-weight: 700; line-height: 1.4; }
+  .mfoot small { display: block; font-size: 17px; font-weight: 500; }
+  .feeding .mfoot { border-top-color: rgba(122,67,0,.2); }
   .btns { flex: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
   .btns.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .btn { height: 88px; border-radius: 20px; border: 2px solid var(--line); background: var(--card); color: var(--ink);
@@ -152,10 +160,10 @@
     main { flex-direction: column; padding: 0 16px 16px; gap: 14px; }
     .video { flex: none; aspect-ratio: 16 / 9; }
     .badge { font-size: 15px; padding: 6px 12px; } .badge.live { left: 12px; top: 12px; } .badge.head { right: 12px; bottom: 12px; font-size: 14px; }
-    .card, .acard { flex: none; padding: 20px; } .card .big { font-size: 38px; } .card .msg { font-size: 20px; }
-    .card svg.cicon { width: 52px; height: 52px; } .card .foot { margin-top: 8px; }
+    .card, .acard { flex: none; padding: 16px 18px; } .card .big { font-size: 28px; } .card .msg { font-size: 17px; }
+    .card svg.cicon { width: 44px; height: 44px; } .card.full { flex: none; }
     .acard .big { font-size: 34px; } .acard .sec b { font-size: 80px; } .ack { height: 96px; font-size: 28px; }
-    .milk { height: 92px; } .milk .t { font-size: 26px; } .btn { height: 76px; font-size: 17px; }
+    .milk { flex: none; padding: 16px 18px; } .mtop { font-size: 22px; } .mbig b { font-size: 64px; } .mbig { font-size: 28px; } .btn { height: 76px; font-size: 17px; }
     .grid { grid-template-columns: 1fr; } .levels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #settings { padding: 16px; } .shead h2 { font-size: 30px; } .phead h2 { font-size: 28px; } .panel { padding: 22px; }
     #nclock { font-size: 96px; } .pill { font-size: 22px; }
@@ -356,14 +364,23 @@ function openHead() {
 function closeHead() { $('headSheet').classList.remove('show'); $('headPreview').removeAttribute('src'); }
 
 /* ---------- 右側の表示 ---------- */
+function hmDur(min) {
+  const h = Math.floor(min / 60), m = min % 60;
+  return h > 0 ? '<b>' + h + '</b>時間<b>' + m + '</b>分' : '<b>' + m + '</b>分';
+}
 function milkButton() {
-  const o = S && S.milk_open, m = S && S.milk_last;
+  const o = S && S.milk_open, m = S && S.milk_last, t = S && S.milk_today;
+  const today = t && t.count ? '今日 ' + t.count + '回・合計 ' + t.total + 'ml<small>ミルク ' + t.milk + 'ml ／ 母乳 ' + t.breast + 'ml</small>' : '今日はまだ記録がありません';
   if (o) {
-    return '<a class="milk feeding" href="/milk">' + ICON.milk + '<span style="display:flex;flex-direction:column;gap:2px;min-width:0">' +
-      '<span class="t">授乳中 ' + o.elapsed_min + '分</span><span class="s">' + o.time + 'から・終わったら押す</span></span></a>';
+    return '<a class="milk feeding" href="/milk"><div class="mtop">' + ICON.milk + '授乳中<span class="go">終わったら押す ›</span></div>' +
+      '<div class="mlabel">' + o.time + ' から</div><div class="mbig">' + hmDur(o.elapsed_min) + '</div>' +
+      '<div class="msub">飲み終わったら押して<br>ミルクと母乳の量を入れます</div><div class="mfoot">' + today + '</div></a>';
   }
-  return '<a class="milk" href="/milk">' + ICON.milk + '<span style="display:flex;flex-direction:column;gap:2px;min-width:0">' +
-    '<span class="t">ミルク・母乳</span><span class="s">' + (m ? '前回 ' + m.ago_text + '・' + m.amount + 'ml' : 'まだ記録がありません') + '</span></span></a>';
+  return '<a class="milk" href="/milk"><div class="mtop">' + ICON.milk + 'ミルク・母乳<span class="go">押して記録 ›</span></div>' +
+    '<div class="mlabel">前回の授乳から</div>' +
+    (m ? '<div class="mbig">' + hmDur(m.minutes_ago) + '</div><div class="msub">前回 ' + m.time + ' 開始・<b>' + m.amount + 'ml</b><br>ミルク ' + m.milk + 'ml ＋ 母乳 ' + m.breast + 'ml</div>'
+       : '<div class="mbig" style="font-size:44px">記録なし</div><div class="msub">あげ始めに押してください</div>') +
+    '<div class="mfoot">' + today + '</div></a>';
 }
 function buttons(st) {
   const paused = st.phase === 'PAUSED' || st.phase === 'NO_CAMERA';
@@ -381,7 +398,7 @@ function renderSide() {
   document.body.classList.toggle('alert', online && st.phase === 'ALERT');
   if (!online) {
     key = 'offline';
-    html = '<div class="card gray">' + ICON.warn + '<div class="big">通信できません</div><div class="msg">見守りカメラの<br>プログラムにつながりません。<br>自動で再接続します。</div></div>';
+    html = '<div class="card gray full">' + ICON.warn + '<div class="big">通信できません</div><div class="msg">見守りカメラの<br>プログラムにつながりません。<br>自動で再接続します。</div></div>';
   } else if (st.phase === 'ALERT') {
     key = 'alert' + st.acked + Math.floor(st.absent_sec || 0);
     const n = S.notify, sent = (n.discord || n.mail) ? 'スマホに通知しました' : '通知先が未設定です';
@@ -394,25 +411,22 @@ function renderSide() {
   } else {
     let card;
     if (st.phase === 'WATCHING' && st.face_visible) {
-      card = '<div class="card">' + ICON.ok + '<div class="big">見守り中</div><div class="msg">赤ちゃんの顔が<br>見えています</div>' +
-        '<div class="foot">見守り開始から<b>' + dur(st.armed_sec) + '</b></div></div>';
+      card = '<div class="card">' + ICON.ok + '<div class="ctext"><div class="big">見守り中</div><div class="msg">顔OK・見守り ' + dur(st.armed_sec) + '</div></div></div>';
     } else if (st.phase === 'WATCHING') {
       const left = Math.max(0, Math.ceil(st.absent_limit - st.absent_sec));
-      card = '<div class="card warn">' + ICON.search + '<div class="big">顔を探しています</div><div class="msg">見えない時間 ' + Math.floor(st.absent_sec) + '秒</div>' +
-        '<div class="foot">あと<b>' + left + '秒で通知します</b></div></div>';
+      card = '<div class="card warn">' + ICON.search + '<div class="ctext"><div class="big">顔を探しています</div><div class="msg">あと' + left + '秒で通知します</div></div></div>';
     } else if (st.phase === 'WAITING') {
       const p = Math.min(100, Math.round(100 * st.confirm_progress / st.confirm_sec));
-      card = '<div class="card wait">' + ICON.search + '<div class="big">顔を確認中</div>' +
-        '<div class="bar"><div style="width:' + p + '%"></div></div><div class="count">' + Math.floor(st.confirm_progress) + ' / ' + st.confirm_sec + ' 秒</div>' +
-        '<div class="foot">顔が' + st.confirm_sec + '秒見えたら<br>見守りを始めます。<br>この間は通知しません。</div></div>';
+      card = '<div class="card wait">' + ICON.search + '<div class="ctext"><div class="big">顔を確認中</div>' +
+        '<div class="bar"><div style="width:' + p + '%"></div></div><div class="msg">' + Math.floor(st.confirm_progress) + ' / ' + st.confirm_sec + '秒（見えたら見守り開始）</div></div></div>';
     } else if (st.phase === 'PAUSED') {
-      card = '<div class="card gray">' + ICON.pause + '<div class="big">一時停止中</div><div class="msg">通知はしません。<br>寝かせたら「見守り開始」を<br>押してください。</div></div>';
+      card = '<div class="card gray">' + ICON.pause + '<div class="ctext"><div class="big">一時停止中</div><div class="msg">寝かせたら「見守り開始」</div></div></div>';
     } else if (st.phase === 'NO_CAMERA') {
-      card = '<div class="card gray">' + ICON.cam + '<div class="big">カメラが<br>見つかりません</div><div class="msg">ケーブルを確認してください。<br>見つかり次第、自動で始めます。</div></div>';
+      card = '<div class="card gray">' + ICON.cam + '<div class="ctext"><div class="big">カメラなし</div><div class="msg">ケーブルを確認してください</div></div></div>';
     } else {
-      card = '<div class="card gray">' + ICON.search + '<div class="big">起動中…</div></div>';
+      card = '<div class="card gray">' + ICON.search + '<div class="ctext"><div class="big">起動中…</div></div></div>';
     }
-    key = card + (S.milk_last ? S.milk_last.ago_text + S.milk_last.amount : '') + JSON.stringify(S.milk_open) + S.local;
+    key = card + JSON.stringify([S.milk_last, S.milk_open, S.milk_today]) + S.local;
     html = card + milkButton() + buttons(st);
   }
   if (key !== sideKey) { $('side').innerHTML = html; sideKey = key; }

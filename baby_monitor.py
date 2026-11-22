@@ -59,7 +59,7 @@ DEFAULTS = {
     "detection": {"score_threshold": 0.6, "try_rotations": True, "detect_width": 640},
     "camera": {"width": 1280, "height": 720, "rotate": 0},
     "web": {"port": 8000, "jpeg_quality": 80},
-    "milk": {"default_ml": 100, "step_ml": 10, "max_ml": 300,
+    "milk": {"default_ml": 100, "step_ml": 10, "breast_step_ml": 5, "max_ml": 300,
              "presets": [40, 60, 80, 100, 120, 160], "undo_sec": 10},
     "display": {"night_start": "21:00", "night_end": "07:00", "night_mode": "dim",
                 "brightness_day": 100, "brightness_night": 10, "wake_sec": 30},
@@ -621,6 +621,7 @@ class Handler(server.BaseHTTPRequestHandler):
             "local": self.client_address[0] in ("127.0.0.1", "::1"),
             "milk_last": ms.get("last"),
             "milk_open": ms.get("open"),
+            "milk_today": {k: ms.get("today_" + k, 0) for k in ("total", "milk", "breast", "count")},
         }
 
     def _json(self, code, obj):
