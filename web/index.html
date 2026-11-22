@@ -97,7 +97,7 @@
   .panel { width: min(900px, 100%); background: var(--card); border-radius: 28px; padding: 30px 34px; display: flex; flex-direction: column; gap: 18px; }
   .phead { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
   .phead h2 { margin: 0; font-size: 36px; font-weight: 900; }
-  .close { height: 64px; padding: 0 26px; border-radius: 18px; border: 2px solid var(--ink); background: var(--card); color: var(--ink); font-size: 24px; font-weight: 700; }
+  .close { white-space: nowrap; flex: none; height: 64px; padding: 0 26px; border-radius: 18px; border: 2px solid var(--ink); background: var(--card); color: var(--ink); font-size: 24px; font-weight: 700; }
   .levels { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
   .opt { min-height: 112px; border-radius: 18px; border: 3px solid var(--line); background: var(--card); color: var(--ink);
     font-size: 26px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
@@ -123,6 +123,21 @@
   .row b.on { color: var(--ok); } .row b.off { color: #5A6372; }
   .test { margin-top: auto; height: 96px; border-radius: 18px; border: 0; background: var(--blue); color: #fff;
     font-size: 26px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 12px; }
+  /* 頭の向き */
+  .heads { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .hopt { position: relative; border-radius: 20px; border: 3px solid var(--line); background: var(--card); color: var(--ink);
+    padding: 10px 8px 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 24px; font-weight: 700; }
+  .hopt svg { width: 100%; height: auto; }
+  .hopt small { font-size: 15px; font-weight: 500; color: var(--sub); }
+  .hopt.on { border: 5px solid var(--blue); background: var(--blue-bg); padding: 8px 6px 10px; }
+  .hopt.on::after { content: "✓"; position: absolute; top: 8px; right: 10px; width: 34px; height: 34px; border-radius: 17px;
+    background: var(--blue); color: #fff; font-size: 22px; display: flex; align-items: center; justify-content: center; }
+  .hcheck { display: flex; gap: 18px; align-items: center; }
+  .hcheck .pv { width: 240px; aspect-ratio: 4 / 3; flex: none; border-radius: 14px; background: #151B23; overflow: hidden; position: relative; }
+  .hcheck .pv img { width: 100%; height: 100%; object-fit: contain; }
+  .hcheck p { margin: 0; font-size: 20px; line-height: 1.6; color: var(--sub); }
+  #headSheet .panel { width: min(1100px, 100%); }
+  #settings .hopt small { display: none; }
   #toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 50; padding: 14px 24px; border-radius: 14px;
     background: var(--ink); color: #fff; font-size: 22px; font-weight: 700; display: none; }
 
@@ -142,6 +157,9 @@
     .grid { grid-template-columns: 1fr; } .levels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #settings { padding: 16px; } .shead h2 { font-size: 30px; } .phead h2 { font-size: 28px; } .panel { padding: 22px; }
     #nclock { font-size: 96px; } .pill { font-size: 22px; }
+    .heads { grid-template-columns: repeat(2, minmax(0, 1fr)); } .hopt { font-size: 18px; }
+    .hcheck { flex-direction: column; align-items: stretch; } .hcheck .pv { width: 100%; }
+    .sheet { align-items: flex-start; overflow-y: auto; } .close { height: 52px; padding: 0 16px; font-size: 20px; }
   }
 </style>
 </head>
@@ -164,7 +182,7 @@
     <div class="video">
       <img id="video" src="/stream.mjpg" alt="ライブ映像">
       <div class="badge live"><i></i>ライブ映像</div>
-      <div class="badge head" id="headlabel">頭：カメラ側</div>
+      <div class="badge head" id="headlabel">頭：奥</div>
     </div>
     <div class="side" id="side"></div>
   </main>
@@ -194,6 +212,18 @@
   </div>
 </div>
 
+<div class="sheet" id="headSheet" role="dialog" aria-modal="true" aria-labelledby="htitle">
+  <div class="panel">
+    <div class="phead"><h2 id="htitle">赤ちゃんの頭の向き</h2><button class="close" data-close="headSheet">閉じる</button></div>
+    <div class="pnote">カメラの側から見て、赤ちゃんの頭がどちらにあるかを選んでください。</div>
+    <div class="heads" id="headsA"></div>
+    <div class="hcheck">
+      <div class="pv"><img id="headPreview" alt="いまの映像"></div>
+      <p>選ぶと映像が回ります。<br><b>赤ちゃんの頭が上に映っていればOK</b>です。<br>逆さまや横向きなら、別の向きを選んでください。</p>
+    </div>
+  </div>
+</div>
+
 <div id="settings" role="dialog" aria-modal="true" aria-labelledby="stitle">
   <div class="shead">
     <button class="back" id="closeSettings">
@@ -203,11 +233,8 @@
   <div class="grid">
     <div class="box">
       <h3>赤ちゃんの頭の向き</h3>
-      <p>カメラ側か反対側かで、映像を上下に回します</p>
-      <div class="choices" style="grid-template-columns:repeat(2,minmax(0,1fr))">
-        <button class="opt" data-set="head" data-v="camera">カメラ側</button>
-        <button class="opt" data-set="head" data-v="opposite">反対側</button>
-      </div>
+      <p>カメラの側から見て、頭がどちらにあるか</p>
+      <div class="heads" id="headsB" style="margin-top:auto"></div>
     </div>
     <div class="box">
       <h3>お知らせまでの時間</h3>
@@ -283,6 +310,49 @@ async function post(path, body) {
   return r.json();
 }
 
+/* ---------- 頭の向き（図） ---------- */
+const HEADS = [['left', '左', 'ベッドの長い向き'], ['right', '右', 'ベッドの長い向き'], ['far', '奥', '柵と直角に'], ['near', '手前', '柵と直角に']];
+const HEAD_JA = { left: '左', right: '右', far: '奥', near: '手前（カメラ側）' };
+function headSvg(h) {
+  // ベビーベッドを真上から見た図。下の辺にカメラ。赤ちゃん＝頭（丸）＋からだ（布団）
+  const along = h === 'left' || h === 'right';
+  let head, body;
+  if (along) {
+    const hx = h === 'left' ? 52 : 108;
+    body = '<rect x="62" y="40" width="36" height="22" rx="10" fill="#9CC3E8" stroke="#1D2430" stroke-width="2"/>';
+    head = [hx, 51];
+  } else {
+    const hy = h === 'far' ? 30 : 70;
+    body = '<rect x="69" y="' + (h === 'far' ? 39 : 39) + '" width="22" height="22" rx="9" fill="#9CC3E8" stroke="#1D2430" stroke-width="2"/>';
+    head = [80, hy];
+  }
+  return '<svg viewBox="0 0 160 116" aria-hidden="true">' +
+    '<rect x="8" y="8" width="144" height="80" rx="8" fill="#FBFAF6" stroke="#1D2430" stroke-width="3"/>' +
+    '<rect x="16" y="16" width="128" height="64" rx="5" fill="none" stroke="#C9C4B8" stroke-width="2" stroke-dasharray="4 4"/>' +
+    body +
+    '<circle cx="' + head[0] + '" cy="' + head[1] + '" r="10" fill="#F2C9A0" stroke="#1D2430" stroke-width="2"/>' +
+    '<rect x="68" y="90" width="24" height="14" rx="3" fill="#1D2430"/><circle cx="80" cy="97" r="4" fill="#9CC3E8"/>' +
+    '<text x="80" y="115" font-size="11" text-anchor="middle" fill="#4A5363" font-weight="700">カメラ</text></svg>';
+}
+function headOptions(cur) {
+  return HEADS.map(([v, t, sub]) => '<button class="hopt' + (v === cur ? ' on' : '') + '" data-head="' + v + '">' + headSvg(v) +
+    '<span>頭が' + t + '</span><small>' + sub + '</small></button>').join('');
+}
+function renderHeads() {
+  const cur = S ? S.settings.head : 'far';
+  $('headsA').innerHTML = headOptions(cur);
+  $('headsB').innerHTML = headOptions(cur);
+}
+async function setHead(v) {
+  const j = await post('/api/settings', { head: v });
+  if (j.ok) { S = { ...S, ...j, local: S.local }; renderHeads(); renderSide(); toast('頭の向き：' + HEAD_JA[v]); }
+}
+document.addEventListener('click', (e) => { const b = e.target.closest('[data-head]'); if (b) setHead(b.dataset.head); });
+function openHead() {
+  renderHeads(); $('headPreview').src = '/stream.mjpg?pv=' + Date.now(); $('headSheet').classList.add('show');
+}
+function closeHead() { $('headSheet').classList.remove('show'); $('headPreview').removeAttribute('src'); }
+
 /* ---------- 右側の表示 ---------- */
 function milkButton() {
   const m = S && S.milk_last;
@@ -343,7 +413,7 @@ function renderSide() {
   $('titletext').textContent = online && st.phase === 'ALERT' ? 'アラート　すぐに様子を見てください' : '見守りカメラ';
   const n = S ? S.notify : null;
   $('notif').innerHTML = n ? ICON.bell + ((n.discord || n.mail) ? (st.phase === 'PAUSED' ? '通知 停止中' : '通知 オン') : '通知 未設定') : '';
-  $('headlabel').textContent = '頭：' + (S && S.settings.head === 'opposite' ? '反対側' : 'カメラ側');
+  $('headlabel').textContent = '頭：' + HEAD_JA[(S && S.settings.head) || 'far'];
 }
 
 /* ---------- 夜の画面と明るさ（ラズパイの画面のときだけ） ---------- */
@@ -432,10 +502,11 @@ $('settings').addEventListener('click', async (e) => {
   const j = await post('/api/settings', { [b.dataset.set]: b.dataset.v });
   if (j.ok) { S = { ...S, ...j, local: S.local }; renderSettings(); renderSide(); toast('変更しました'); }
 });
-$('openSettings').onclick = () => { if (!S) return; renderSettings(); $('settings').classList.add('show'); };
+$('openSettings').onclick = () => { if (!S) return; renderSettings(); renderHeads(); $('settings').classList.add('show'); };
 $('closeSettings').onclick = () => $('settings').classList.remove('show');
 $('testNotify').onclick = async () => { await post('/api/test-notify'); toast('テスト通知を送りました'); };
-document.querySelectorAll('[data-close]').forEach((b) => b.onclick = () => $(b.dataset.close).classList.remove('show'));
+document.querySelectorAll('[data-close]').forEach((b) => b.onclick = () => b.dataset.close === 'headSheet' ? closeHead() : $(b.dataset.close).classList.remove('show'));
+$('headSheet').addEventListener('click', (e) => { if (e.target === $('headSheet')) closeHead(); });
 $('brightSheet').addEventListener('click', (e) => { if (e.target === $('brightSheet')) $('brightSheet').classList.remove('show'); });
 
 /* ---------- 右側のボタン ---------- */
@@ -444,11 +515,7 @@ $('side').addEventListener('click', async (e) => {
   const act = b.dataset.act;
   if (act === 'arm' || act === 'disarm') { await fetch('/' + act, { method: 'POST' }); setTimeout(poll, 300); }
   else if (act === 'ack') { await post('/api/ack'); setTimeout(poll, 300); }
-  else if (act === 'head') {
-    const v = S.settings.head === 'opposite' ? 'camera' : 'opposite';
-    const j = await post('/api/settings', { head: v });
-    if (j.ok) { S = { ...S, ...j, local: S.local }; renderSide(); toast('頭の向き：' + (v === 'opposite' ? '反対側' : 'カメラ側')); }
-  } else if (act === 'bright') { renderBright(); $('brightSheet').classList.add('show'); }
+  else if (act === 'head') openHead(); else if (act === 'bright') { renderBright(); $('brightSheet').classList.add('show'); }
 });
 
 /* ---------- 定期更新 ---------- */

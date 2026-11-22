@@ -60,13 +60,18 @@ class TestUiSettings(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_valid_values_saved(self):
-        applied = self.cfg.set_ui({"absent_sec": "30", "night_mode": "off", "head": "opposite", "brightness_night": 150})
-        self.assertEqual(applied, {"absent_sec": 30.0, "night_mode": "off", "head": "opposite", "brightness_night": 100})
+        applied = self.cfg.set_ui({"absent_sec": "30", "night_mode": "off", "head": "left", "brightness_night": 150})
+        self.assertEqual(applied, {"absent_sec": 30.0, "night_mode": "off", "head": "left", "brightness_night": 100})
         self.assertEqual(self.cfg.alert["absent_sec"], 30.0)
         self.assertEqual(self.cfg.s["display"]["night_mode"], "off")
-        self.assertEqual(self.cfg.head, "opposite")
+        self.assertEqual(self.cfg.head, "left")
         with open(self.cfg.ui_path) as f:
             self.assertEqual(json.load(f)["absent_sec"], 30.0)
+
+    def test_old_head_values(self):
+        self.assertEqual(self.cfg.set_ui({"head": "opposite"}), {"head": "near"})
+        self.assertEqual(self.cfg.set_ui({"head": "camera"}), {"head": "far"})
+        self.assertEqual(bm.HEAD_ROTATE[self.cfg.head], 0)
 
     def test_invalid_values_ignored(self):
         applied = self.cfg.set_ui({"absent_sec": 7, "night_mode": "party", "unknown": 1, "head": "up"})

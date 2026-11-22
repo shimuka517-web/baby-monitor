@@ -70,8 +70,13 @@ UI_KEYS = {
     "night_mode": ("display", "night_mode", lambda v: v if v in ("dim", "off", "none") else None),
     "brightness_day": ("display", "brightness_day", lambda v: max(0, min(100, int(v)))),
     "brightness_night": ("display", "brightness_night", lambda v: max(0, min(100, int(v)))),
-    "head": (None, "head", lambda v: v if v in ("camera", "opposite") else None),
+    "head": (None, "head", lambda v: (LEGACY_HEAD.get(v, v) if LEGACY_HEAD.get(v, v) in HEAD_ROTATE else None)),
 }
+# 赤ちゃんの頭の向き（カメラの側から見て）→ 映像を回す角度（時計回り）
+#   far=奥（映像の上） / right=右 / near=手前（カメラ側） / left=左
+#   settings.toml の [camera] rotate は「奥が映像の上になる」ように合わせておく
+HEAD_ROTATE = {"far": 0, "left": 90, "near": 180, "right": 270}
+LEGACY_HEAD = {"camera": "far", "opposite": "near"}   # v2.4 までの値
 SECRET_DEFAULTS = {
     "discord": {"webhook_url": ""},
     "gmail": {"user": "", "app_password": "", "to": []},
@@ -135,7 +140,10 @@ class Config:
         try:
             with open(self.ui_path, encoding="utf-8") as f:
                 d = json.load(f)
-            return {k: v for k, v in d.items() if k in UI_KEYS}
+            d = {k: v for k, v in d.items() if k in UI_KEYS}
+            if d.get("head") in LEGACY_HEAD:
+                d["head"] = LEGACY_HEAD[d["head"]]
+            return d
         except FileNotFoundError:
             return {}
         except Exception as e:
@@ -175,7 +183,8 @@ class Config:
 
     @property
     def head(self):
-        return self.ui.get("head", "camera")
+        h = self.ui.get("head", "far")
+        return h if h in HEAD_ROTATE else "far"
 
     @staticmethod
     def _mtime():
@@ -736,7 +745,7 @@ def main():
         a, d = cfg.alert, cfg.detection
 
         frame = picam2.capture_array()
-        rot = (cam_cfg["rotate"] + (180 if cfg.head == "opposite" else 0)) % 360   # 頭の向き＝映像を180°回す
+        rot = (cam_cfg["rotate"] + HEAD_ROTATE[cfg.head]) % 360   # 頭の向きに合わせて、頭が上に映るよう回す
         if rot in ROTATE_CODES:
             frame = cv2.rotate(frame, ROTATE_CODES[rot])
 
