@@ -569,16 +569,25 @@ class Handler(server.BaseHTTPRequestHandler):
         elif self.path == "/api/test-notify":
             notify("🔔 見守りカメラのテスト通知です（画面の「設定」から送りました）。")
             self._json(200, {"ok": True})
-        elif self.path in ("/api/milk", "/api/milk/undo"):
+        elif self.path.startswith("/api/milk") or self.path.startswith("/api/feed"):
             try:
                 body = self._body()
-                if self.path == "/api/milk":
-                    rec = MILK.add(body.get("amount", 0), kind=body.get("kind", "ミルク"),
-                                   source=body.get("source", "ベッド横の画面"))
-                    self._json(200, {"ok": True, "record": rec, **self._milk_state()})
+                src = str(body.get("source") or "ベッド横の画面")[:40]
+                if self.path == "/api/feed/start":
+                    rec = MILK.start(source=src)
+                elif self.path == "/api/feed/finish":
+                    rec = MILK.finish(str(body.get("id", "")), body.get("milk", 0), body.get("breast", 0),
+                                      start=body.get("start") or None)
+                elif self.path == "/api/feed/add":
+                    rec = MILK.add(body.get("milk", 0), body.get("breast", 0), body.get("minutes_ago", 0), source=src)
+                elif self.path == "/api/milk":          # v2.5 までの画面との互換（ミルクだけ）
+                    rec = MILK.add(body.get("amount", 0), source=src)
+                elif self.path in ("/api/milk/undo", "/api/feed/undo"):
+                    rec = {"undo": MILK.undo(str(body.get("id", "")))}
                 else:
-                    MILK.undo(str(body.get("id", "")))
-                    self._json(200, {"ok": True, **self._milk_state()})
+                    self._send(404, "text/plain", b"not found")
+                    return
+                self._json(200, {"ok": True, "record": rec, **self._milk_state()})
             except (ValueError, KeyError, TypeError) as e:
                 self._json(400, {"ok": False, "error": str(e).strip("'\"")})
         else:
@@ -601,7 +610,7 @@ class Handler(server.BaseHTTPRequestHandler):
             st = dict(shared.status)
         d, g = cfg.secrets["discord"], cfg.secrets["gmail"]
         disp = cfg.s["display"]
-        last = MILK.summary()["last"] if MILK else None
+        ms = MILK.summary() if MILK else {}
         return {
             "status": st,
             "notify": {"discord": bool(d["webhook_url"]), "mail": bool(g["user"] and g["app_password"] and g["to"])},
@@ -610,7 +619,8 @@ class Handler(server.BaseHTTPRequestHandler):
                           "writable": bool(BACKLIGHT and BACKLIGHT.writable),
                           "level": BACKLIGHT.level if BACKLIGHT else None},
             "local": self.client_address[0] in ("127.0.0.1", "::1"),
-            "milk_last": last,
+            "milk_last": ms.get("last"),
+            "milk_open": ms.get("open"),
         }
 
     def _json(self, code, obj):

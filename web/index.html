@@ -55,6 +55,8 @@
   .milk { height: 112px; flex: none; border-radius: 22px; border: 3px solid var(--blue); background: var(--blue-bg);
     color: var(--blue-ink); text-decoration: none; padding: 0 22px; display: flex; align-items: center; gap: 16px; }
   .milk .t { font-size: 32px; font-weight: 900; line-height: 1.1; }
+  .milk .s { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .milk.feeding { border-color: #C26A00; background: #FFF1DE; color: #7A4300; }
   .milk .s { font-size: 18px; font-weight: 500; }
   .btns { flex: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
   .btns.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -355,9 +357,13 @@ function closeHead() { $('headSheet').classList.remove('show'); $('headPreview')
 
 /* ---------- 右側の表示 ---------- */
 function milkButton() {
-  const m = S && S.milk_last;
-  return '<a class="milk" href="/milk">' + ICON.milk + '<span style="display:flex;flex-direction:column;gap:2px">' +
-    '<span class="t">ミルク</span><span class="s">' + (m ? '前回 ' + m.ago_text + '・' + m.amount + 'ml' : 'まだ記録がありません') + '</span></span></a>';
+  const o = S && S.milk_open, m = S && S.milk_last;
+  if (o) {
+    return '<a class="milk feeding" href="/milk">' + ICON.milk + '<span style="display:flex;flex-direction:column;gap:2px;min-width:0">' +
+      '<span class="t">授乳中 ' + o.elapsed_min + '分</span><span class="s">' + o.time + 'から・終わったら押す</span></span></a>';
+  }
+  return '<a class="milk" href="/milk">' + ICON.milk + '<span style="display:flex;flex-direction:column;gap:2px;min-width:0">' +
+    '<span class="t">ミルク・母乳</span><span class="s">' + (m ? '前回 ' + m.ago_text + '・' + m.amount + 'ml' : 'まだ記録がありません') + '</span></span></a>';
 }
 function buttons(st) {
   const paused = st.phase === 'PAUSED' || st.phase === 'NO_CAMERA';
@@ -406,7 +412,7 @@ function renderSide() {
     } else {
       card = '<div class="card gray">' + ICON.search + '<div class="big">起動中…</div></div>';
     }
-    key = card + (S.milk_last ? S.milk_last.ago_text : '') + S.local;
+    key = card + (S.milk_last ? S.milk_last.ago_text + S.milk_last.amount : '') + JSON.stringify(S.milk_open) + S.local;
     html = card + milkButton() + buttons(st);
   }
   if (key !== sideKey) { $('side').innerHTML = html; sideKey = key; }
