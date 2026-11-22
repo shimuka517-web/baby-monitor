@@ -56,6 +56,19 @@ rotate = 0
 port = 8000
 jpeg_quality = 80
 
+[display]
+# ベッド横の画面（docs/usage.md「夜の画面」）。保存すると自動で反映されます。
+# 夜の画面にする時間帯
+night_start = "21:00"
+night_end = "07:00"
+# 夜の画面："dim"＝暗くする / "off"＝消す / "none"＝そのまま
+night_mode = "dim"
+# 明るさ（0〜100%）。画面の「明るさ」ボタンで変えると data/ui.json に保存され、そちらが優先されます
+brightness_day = 100
+brightness_night = 10
+# 夜の画面で触れたとき、ふだんの画面を出しておく秒数
+wake_sec = 30
+
 [milk]
 # ミルクの記録（docs/milk.md）。保存すると自動で反映されます。
 # 画面を開いたときの量（前回の記録があれば、前回の量から始まります）

@@ -61,6 +61,16 @@ DEFAULTS = {
     "web": {"port": 8000, "jpeg_quality": 80},
     "milk": {"default_ml": 100, "step_ml": 10, "max_ml": 300,
              "presets": [40, 60, 80, 100, 120, 160], "undo_sec": 10},
+    "display": {"night_start": "21:00", "night_end": "07:00", "night_mode": "dim",
+                "brightness_day": 100, "brightness_night": 10, "wake_sec": 30},
+}
+# タッチ画面の「設定」から変えられる項目（data/ui.json に保存し、settings.toml より優先）
+UI_KEYS = {
+    "absent_sec": ("alert", "absent_sec", lambda v: float(v) if float(v) in (10.0, 15.0, 30.0) else None),
+    "night_mode": ("display", "night_mode", lambda v: v if v in ("dim", "off", "none") else None),
+    "brightness_day": ("display", "brightness_day", lambda v: max(0, min(100, int(v)))),
+    "brightness_night": ("display", "brightness_night", lambda v: max(0, min(100, int(v)))),
+    "head": (None, "head", lambda v: v if v in ("camera", "opposite") else None),
 }
 SECRET_DEFAULTS = {
     "discord": {"webhook_url": ""},
@@ -115,9 +125,57 @@ class Config:
     def __init__(self):
         self.lock = threading.Lock()
         self.mtime = self._mtime()
-        self.s = load_toml(SETTINGS_PATH, DEFAULTS, required=True)
+        self.ui_path = os.path.join(DATA_DIR, "ui.json")
+        self.ui = self._load_ui()
+        self.s = self._apply_ui(load_toml(SETTINGS_PATH, DEFAULTS, required=True))
         self.secrets = load_toml(SECRETS_PATH, SECRET_DEFAULTS)
         self._last_check = 0.0
+
+    def _load_ui(self):
+        try:
+            with open(self.ui_path, encoding="utf-8") as f:
+                d = json.load(f)
+            return {k: v for k, v in d.items() if k in UI_KEYS}
+        except FileNotFoundError:
+            return {}
+        except Exception as e:
+            log.warning("%s が読めないため無視します: %s", self.ui_path, e)
+            return {}
+
+    def _apply_ui(self, s):
+        for key, v in self.ui.items():
+            sec, name, _ = UI_KEYS[key]
+            if sec:
+                s[sec][name] = v
+        return s
+
+    def set_ui(self, changes):
+        """タッチ画面の設定を保存して反映。不正な値は無視し、反映した項目を返す"""
+        applied = {}
+        for key, v in changes.items():
+            if key not in UI_KEYS:
+                continue
+            try:
+                v = UI_KEYS[key][2](v)
+            except (TypeError, ValueError):
+                v = None
+            if v is not None:
+                applied[key] = v
+        if applied:
+            with self.lock:
+                self.ui.update(applied)
+                self.s = self._apply_ui(self.s)
+                os.makedirs(DATA_DIR, exist_ok=True)
+                tmp = self.ui_path + ".tmp"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(self.ui, f, ensure_ascii=False, indent=1)
+                os.replace(tmp, self.ui_path)
+            log.info("画面から設定を変更しました: %s", applied)
+        return applied
+
+    @property
+    def head(self):
+        return self.ui.get("head", "camera")
 
     @staticmethod
     def _mtime():
@@ -146,7 +204,7 @@ class Config:
                 if new[sec] != self.s[sec]:
                     log.warning("[%s] の変更は再起動後に反映されます", sec)
                 new[sec] = self.s[sec]
-            self.s = new
+            self.s = self._apply_ui(new)
         log.info("設定を再読み込みしました: alert=%s detection=%s", new["alert"], new["detection"])
         return True
 
@@ -258,15 +316,26 @@ class Monitor:
         self.streak_start = None     # 「続けて見えている」区間の開始時刻
         self.last_alert = 0.0
         self.waiting_notified = False
+        self.acked = False           # アラート中に「様子を見ました」が押された
+        self.armed_since = now if armed else None
 
     def set_armed(self, armed, now):
         self._enter(WAITING if armed else PAUSED, now)
         self.streak_start = None
+        self.armed_since = now if armed else None
+
+    def ack(self):
+        """アラート中に「様子を見ました」：再通知を止め、顔が見えるまで待つ"""
+        if self.phase == ALERT:
+            self.acked = True
+            return True
+        return False
 
     def _enter(self, phase, now):
         self.phase = phase
         self.phase_since = now
         self.waiting_notified = False
+        self.acked = False
 
     def streak_sec(self, now):
         return 0.0 if self.streak_start is None else now - self.streak_start
@@ -305,7 +374,7 @@ class Monitor:
             if self.streak_start is not None and now - max(self.streak_start, self.phase_since) >= a["recover_sec"]:
                 self._enter(WATCHING, now)
                 events.append("recovered")
-            elif not visible and now - self.last_alert >= a["repeat_sec"]:
+            elif not visible and not self.acked and now - self.last_alert >= a["repeat_sec"]:
                 self.last_alert = now
                 events.append("repeat")
         return events
@@ -319,6 +388,7 @@ class Shared:
         self.jpeg = None
         self.status = {}
         self.arm_request = None  # Webからの開始/停止要求
+        self.ack_request = False  # Webからの「様子を見ました」
 
     def set_jpeg(self, data):
         with self.cond:
@@ -332,6 +402,52 @@ class Shared:
 
 
 shared = Shared()
+
+
+class Backlight:
+    """液晶のバックライト（/sys/class/backlight/*）の明るさを 0〜100% で変える。
+    書き込みには権限が必要（scripts/install-service.sh が udev ルールで video グループに許可）"""
+
+    def __init__(self, root="/sys/class/backlight"):
+        self.path, self.max = None, 0
+        try:
+            for name in sorted(os.listdir(root)):
+                d = os.path.join(root, name)
+                with open(os.path.join(d, "max_brightness")) as f:
+                    self.max = int(f.read().strip())
+                self.path = os.path.join(d, "brightness")
+                break
+        except (OSError, ValueError):
+            self.path = None
+        self.level = None
+
+    @property
+    def available(self):
+        return self.path is not None and self.max > 0
+
+    @property
+    def writable(self):
+        return self.available and os.access(self.path, os.W_OK)
+
+    def set(self, pct):
+        """明るさ（0〜100%）を設定。成功したら True"""
+        pct = max(0, min(100, int(pct)))
+        if not self.available:
+            return False
+        raw = round(self.max * pct / 100)
+        if pct > 0:
+            raw = max(1, raw)
+        try:
+            with open(self.path, "w") as f:
+                f.write(str(raw))
+            self.level = pct
+            return True
+        except OSError as e:
+            log.warning("明るさを変えられません（%s）。scripts/install-service.sh をもう一度実行してください", e)
+            return False
+
+
+BACKLIGHT = None   # Backlight（main() で用意）
 MILK = None   # milk.MilkLog（main() で用意）
 
 
@@ -348,64 +464,6 @@ def init_milk():
 
 
 # ================================================================ Web配信
-PAGE = """<!doctype html>
-<html lang="ja"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>見守りカメラ</title>
-<style>
- html,body{margin:0;height:100%;background:#000;color:#eee;font-family:sans-serif}
- #wrap{display:flex;flex-direction:column;height:100%}
- #video{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;border:6px solid transparent;box-sizing:border-box}
- #video.alert{border-color:#ff1744;animation:blink 1s infinite}
- @keyframes blink{50%{border-color:transparent}}
- #video img{max-width:100%;max-height:100%}
- #bar{display:flex;gap:12px;align-items:center;padding:8px 12px;background:#111;font-size:18px;flex-wrap:wrap}
- #st{flex:1}
- .ng{color:#ff5252;font-weight:bold}.ok{color:#69f0ae}.wait{color:#ffd740}.gray{color:#aaa}
- button{font-size:16px;padding:6px 14px}
- #milk{display:flex;flex-direction:column;justify-content:center;min-height:56px;padding:4px 18px;border-radius:14px;background:#E4EEFA;color:#12407E;text-decoration:none;font-weight:700;font-size:22px;line-height:1.2}
- #milk small{font-size:14px;font-weight:500}
-</style></head><body>
-<div id="wrap">
- <div id="video"><img src="/stream.mjpg" alt="stream"></div>
- <div id="bar">
-  <span id="st">接続中…</span>
-  <a id="milk" href="/milk">ミルク<small id="milklast">記録なし</small></a>
-  <button onclick="setArm(true)">見守り開始</button>
-  <button onclick="setArm(false)">一時停止</button>
- </div>
-</div>
-<script>
-async function pollMilk(){
- try{
-  const m=await (await fetch('/api/milk')).json();
-  document.getElementById('milklast').textContent=m.last?('前回 '+m.last.ago_text+'・'+m.last.amount+'ml'):'記録なし';
- }catch(e){}
-}
-setInterval(pollMilk,30000);pollMilk();
-async function setArm(on){await fetch(on?'/arm':'/disarm',{method:'POST'});setTimeout(poll,300);}
-async function poll(){
- try{
-  const s=await (await fetch('/status')).json();
-  let t='';
-  if(s.phase==='NO_CAMERA'){document.getElementById('st').innerHTML='<span class="wait">カメラが見つかりません（接続を確認してください）</span>';return;}
-  if(s.phase==='PAUSED') t='<span class="gray">一時停止中</span>';
-  else if(s.phase==='WAITING') t='<span class="wait">顔の確認待ち（'+s.confirm_progress+' / '+s.confirm_sec+'秒）</span>';
-  else if(s.phase==='WATCHING') t=s.face_visible?'<span class="ok">見守り中・顔OK</span>'
-        :'<span class="ng">見守り中・顔が見えません（'+s.absent_sec+' / '+s.absent_limit+'秒）</span>';
-  else if(s.phase==='ALERT') t='<span class="ng">⚠ アラート中・顔が見えません（'+s.absent_sec+'秒）</span>';
-  t+=' ｜ '+s.fps+' fps';
-  document.getElementById('st').innerHTML=t;
-  document.getElementById('video').className=s.phase==='ALERT'?'alert':'';
- }catch(e){document.getElementById('st').textContent='接続が切れました（再接続中）';}
-}
-setInterval(poll,1000);poll();
-document.querySelector('#video img').onerror=()=>setTimeout(()=>location.reload(),3000);
-</script>
-</body></html>
-"""
-
-
 class Handler(server.BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass
@@ -433,24 +491,26 @@ class Handler(server.BaseHTTPRequestHandler):
     def do_GET(self):
         if not self._auth_ok():
             return
-        if self.path in ("/", "/index.html"):
-            self._send(200, "text/html; charset=utf-8", PAGE.encode())
-        elif self.path == "/status":
+        path = self.path.split("?", 1)[0]
+        if path in ("/", "/index.html"):
+            self._file("index.html")
+        elif path == "/milk":
+            self._file("milk.html")
+        elif path == "/status":
             with shared.lock:
                 body = json.dumps(shared.status).encode()
             self._send(200, "application/json", body)
-        elif self.path == "/milk":
-            with open(os.path.join(WEB_DIR, "milk.html"), "rb") as f:
-                self._send(200, "text/html; charset=utf-8", f.read())
-        elif self.path == "/api/milk":
+        elif path == "/api/state":
+            self._json(200, self._state())
+        elif path == "/api/milk":
             self._json(200, self._milk_state())
-        elif self.path == "/snapshot.jpg":
+        elif path == "/snapshot.jpg":
             jpeg = shared.jpeg
             if jpeg:
                 self._send(200, "image/jpeg", jpeg)
             else:
                 self._send(503, "text/plain", b"no frame yet")
-        elif self.path == "/stream.mjpg":
+        elif path == "/stream.mjpg":
             self.send_response(200)
             self.send_header("Age", "0")
             self.send_header("Cache-Control", "no-cache, private")
@@ -479,10 +539,30 @@ class Handler(server.BaseHTTPRequestHandler):
             with shared.lock:
                 shared.arm_request = armed
             self._send(200, "application/json", json.dumps({"armed": armed}).encode())
+        elif self.path == "/api/ack":
+            with shared.lock:
+                shared.ack_request = True
+            self._json(200, {"ok": True})
+        elif self.path == "/api/settings":
+            try:
+                applied = cfg.set_ui(self._body())
+                self._json(200, {"ok": True, "applied": applied, **self._state()})
+            except (ValueError, TypeError) as e:
+                self._json(400, {"ok": False, "error": str(e)})
+        elif self.path == "/api/brightness":
+            try:
+                pct = int(self._body().get("level", 100))
+            except (ValueError, TypeError):
+                self._json(400, {"ok": False, "error": "level は 0〜100"})
+                return
+            ok = BACKLIGHT.set(pct) if BACKLIGHT else False
+            self._json(200, {"ok": ok, "level": pct, "hardware": bool(BACKLIGHT and BACKLIGHT.available)})
+        elif self.path == "/api/test-notify":
+            notify("🔔 見守りカメラのテスト通知です（画面の「設定」から送りました）。")
+            self._json(200, {"ok": True})
         elif self.path in ("/api/milk", "/api/milk/undo"):
             try:
-                n = int(self.headers.get("Content-Length") or 0)
-                body = json.loads(self.rfile.read(n) or b"{}")
+                body = self._body()
                 if self.path == "/api/milk":
                     rec = MILK.add(body.get("amount", 0), kind=body.get("kind", "ミルク"),
                                    source=body.get("source", "ベッド横の画面"))
@@ -494,6 +574,35 @@ class Handler(server.BaseHTTPRequestHandler):
                 self._json(400, {"ok": False, "error": str(e).strip("'\"")})
         else:
             self._send(404, "text/plain", b"not found")
+
+    def _body(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        d = json.loads(self.rfile.read(n) or b"{}")
+        if not isinstance(d, dict):
+            raise ValueError("JSON object expected")
+        return d
+
+    def _file(self, name):
+        with open(os.path.join(WEB_DIR, name), "rb") as f:
+            self._send(200, "text/html; charset=utf-8", f.read())
+
+    def _state(self):
+        """タッチ画面用：見守りの状態・通知先・画面の設定・ミルクの前回をまとめて返す"""
+        with shared.lock:
+            st = dict(shared.status)
+        d, g = cfg.secrets["discord"], cfg.secrets["gmail"]
+        disp = cfg.s["display"]
+        last = MILK.summary()["last"] if MILK else None
+        return {
+            "status": st,
+            "notify": {"discord": bool(d["webhook_url"]), "mail": bool(g["user"] and g["app_password"] and g["to"])},
+            "settings": {"absent_sec": cfg.alert["absent_sec"], "head": cfg.head, **disp},
+            "backlight": {"hardware": bool(BACKLIGHT and BACKLIGHT.available),
+                          "writable": bool(BACKLIGHT and BACKLIGHT.writable),
+                          "level": BACKLIGHT.level if BACKLIGHT else None},
+            "local": self.client_address[0] in ("127.0.0.1", "::1"),
+            "milk_last": last,
+        }
 
     def _json(self, code, obj):
         self._send(code, "application/json; charset=utf-8", json.dumps(obj, ensure_ascii=False).encode())
@@ -553,7 +662,7 @@ def draw_overlay(frame, box, visible, mon, now, a):
         cv2.rectangle(frame, (0, 0), (fw - 1, fh - 1), RED, thick * 3)
 
     put_label(frame, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), (12, 32), WHITE)
-    put_label(frame, status, (12, 68), color)
+    # 状態の文字はタッチ画面（右側）に出すので、映像には時刻だけ入れる（status は今は未使用）
 
 
 # ================================================================ メイン
@@ -605,6 +714,10 @@ def main():
     detector = FaceDetector(MODEL_PATH, cfg.detection["score_threshold"])
 
     # 先にWeb画面とミルク記録を始める（カメラがなくても使えるように）
+    global BACKLIGHT
+    BACKLIGHT = Backlight()
+    log.info("液晶の明るさ調整: %s", "使えます" if BACKLIGHT.writable else
+             ("権限がありません（scripts/install-service.sh を再実行）" if BACKLIGHT.available else "対応する液晶なし"))
     init_milk()
     httpd = StreamingServer(("", web_cfg["port"]), Handler)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
@@ -623,7 +736,7 @@ def main():
         a, d = cfg.alert, cfg.detection
 
         frame = picam2.capture_array()
-        rot = cam_cfg["rotate"]
+        rot = (cam_cfg["rotate"] + (180 if cfg.head == "opposite" else 0)) % 360   # 頭の向き＝映像を180°回す
         if rot in ROTATE_CODES:
             frame = cv2.rotate(frame, ROTATE_CODES[rot])
 
@@ -640,9 +753,12 @@ def main():
 
         with shared.lock:
             req, shared.arm_request = shared.arm_request, None
+            ack, shared.ack_request = shared.ack_request, False
         if req is not None:
             mon.set_armed(req, now)
             log.info("見守りを%sしました（ブラウザ操作）", "開始" if req else "一時停止")
+        if ack and mon.ack():
+            log.info("「様子を見ました」が押されました。顔が見えるまで再通知を止めます")
 
         events = mon.update(visible, now, a)
 
@@ -679,6 +795,8 @@ def main():
                 "absent_sec": round(mon.absent_sec(now), 1),
                 "absent_limit": a["absent_sec"],
                 "fps": round(fps, 1),
+                "acked": mon.acked,
+                "armed_sec": None if mon.armed_since is None else round(now - mon.armed_since),
             }
 
 

@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>見守りカメラ</title>
+<style>
+  :root {
+    --bg: #F4F2EC; --ink: #1D2430; --sub: #4A5363; --line: #C9C4B8; --card: #FFFFFF;
+    --ok: #1C7A4E; --wait: #F5C04A; --wait-ink: #2A1F00; --warn: #B85C00;
+    --alert: #A9281A; --alert-ink: #8E1F12; --blue: #1F5FB8; --blue-ink: #12407E; --blue-bg: #E4EEFA;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font-family: "Noto Sans JP", "Noto Sans CJK JP", "Hiragino Sans", sans-serif;
+    -webkit-tap-highlight-color: transparent; user-select: none; overflow: hidden; }
+  button, a { font-family: inherit; touch-action: manipulation; cursor: pointer; }
+  button:active, a:active { transform: scale(0.97); }
+  svg { flex: none; }
+  .page { height: 100%; display: flex; flex-direction: column; }
+
+  /* 上の帯 */
+  header { height: 72px; flex: none; padding: 0 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .title { display: flex; align-items: center; gap: 14px; font-size: 22px; font-weight: 700; white-space: nowrap; }
+  .hright { display: flex; align-items: center; gap: 28px; font-size: 20px; color: #3B4453; }
+  #notif { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  #clock { font-size: 30px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .iconbtn { width: 56px; height: 56px; border-radius: 16px; border: 2px solid var(--line); background: var(--card);
+    display: flex; align-items: center; justify-content: center; }
+
+  /* 本体 */
+  main { flex: 1; min-height: 0; padding: 0 32px 32px; display: flex; gap: 24px; }
+  .video { flex: 0 0 64%; position: relative; border-radius: 24px; background: #151B23; overflow: hidden; }
+  .video img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .badge { position: absolute; display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-radius: 999px;
+    background: rgba(0,0,0,0.55); color: #fff; font-size: 20px; font-weight: 500; }
+  .badge.live { left: 24px; top: 24px; }
+  .badge.live i { width: 12px; height: 12px; border-radius: 6px; background: #FF5A4A; }
+  .badge.head { right: 24px; bottom: 24px; border-radius: 12px; font-size: 18px; color: #E6EAF0; }
+  .side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+
+  .card { flex: 1; min-height: 0; border-radius: 24px; padding: 32px; display: flex; flex-direction: column; gap: 12px;
+    background: var(--ok); color: #fff; }
+  .card .big { font-size: 56px; font-weight: 900; line-height: 1.1; }
+  .card .msg { font-size: 26px; font-weight: 500; line-height: 1.45; }
+  .card .foot { margin-top: auto; font-size: 20px; line-height: 1.5; }
+  .card .foot b { display: block; font-size: 30px; font-weight: 700; }
+  .card.wait { background: var(--wait); color: var(--wait-ink); }
+  .card.warn { background: var(--warn); }
+  .card.gray { background: #5A6372; }
+  .bar { height: 22px; border-radius: 11px; background: rgba(42,31,0,0.18); overflow: hidden; }
+  .bar div { height: 100%; border-radius: 11px; background: var(--wait-ink); transition: width .4s; }
+  .count { font-size: 30px; font-weight: 700; }
+
+  .milk { height: 112px; flex: none; border-radius: 22px; border: 3px solid var(--blue); background: var(--blue-bg);
+    color: var(--blue-ink); text-decoration: none; padding: 0 22px; display: flex; align-items: center; gap: 16px; }
+  .milk .t { font-size: 32px; font-weight: 900; line-height: 1.1; }
+  .milk .s { font-size: 18px; font-weight: 500; }
+  .btns { flex: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .btns.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .btn { height: 88px; border-radius: 20px; border: 2px solid var(--line); background: var(--card); color: var(--ink);
+    font-size: 20px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+  .btn.dark { border-color: var(--ink); }
+  .btn.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+  /* アラート */
+  body.alert { background: var(--alert); }
+  body.alert header, body.alert .hright, body.alert #clock { color: #fff; }
+  body.alert .title { font-size: 26px; font-weight: 900; }
+  body.alert .video { border: 6px solid #fff; }
+  .acard { flex: 1; min-height: 0; border-radius: 24px; background: #fff; color: var(--alert-ink); padding: 32px;
+    display: flex; flex-direction: column; gap: 6px; }
+  .acard .big { font-size: 50px; font-weight: 900; line-height: 1.15; }
+  .acard .sec { display: flex; align-items: baseline; gap: 8px; margin-top: 8px; }
+  .acard .sec b { font-size: 120px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+  .acard .sec span { font-size: 36px; font-weight: 700; }
+  .acard .sent { margin-top: auto; display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 700; color: var(--ink); }
+  .ack { height: 120px; flex: none; border-radius: 24px; border: 0; background: #FFD84D; color: var(--wait-ink);
+    font-size: 34px; font-weight: 900; display: flex; align-items: center; justify-content: center; gap: 14px; }
+  .anote { flex: none; font-size: 18px; line-height: 1.5; color: #FFE3DD; text-align: center; }
+
+  /* 夜の画面・画面オフ */
+  #night { position: fixed; inset: 0; z-index: 30; background: #0A0D12; color: #9AA4B2; display: none;
+    flex-direction: column; align-items: center; justify-content: center; gap: 28px; }
+  #night.show { display: flex; }
+  #night.off > * { visibility: hidden; }
+  #nclock { font-size: 168px; font-weight: 500; line-height: 1; letter-spacing: 4px; font-variant-numeric: tabular-nums; }
+  .pill { display: flex; align-items: center; gap: 16px; padding: 14px 28px; border-radius: 999px; border: 2px solid #26303B; font-size: 30px; font-weight: 500; }
+  .pill i { width: 22px; height: 22px; border-radius: 11px; background: #2E9A66; }
+  .nhint { position: absolute; bottom: 40px; display: flex; align-items: center; gap: 12px; font-size: 22px; color: #7F8A99; }
+  .nwhen { position: absolute; top: 36px; right: 40px; font-size: 20px; color: #7F8A99; }
+  #dim { position: fixed; inset: 0; z-index: 40; background: #000; opacity: 0; pointer-events: none; transition: opacity .3s; }
+
+  /* 下から出るパネル（明るさ）・設定 */
+  .sheet { position: fixed; inset: 0; z-index: 20; background: rgba(29,36,48,0.55); display: none; align-items: center; justify-content: center; padding: 16px; }
+  .sheet.show { display: flex; }
+  .panel { width: min(900px, 100%); background: var(--card); border-radius: 28px; padding: 30px 34px; display: flex; flex-direction: column; gap: 18px; }
+  .phead { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .phead h2 { margin: 0; font-size: 36px; font-weight: 900; }
+  .close { height: 64px; padding: 0 26px; border-radius: 18px; border: 2px solid var(--ink); background: var(--card); color: var(--ink); font-size: 24px; font-weight: 700; }
+  .levels { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .opt { min-height: 112px; border-radius: 18px; border: 3px solid var(--line); background: var(--card); color: var(--ink);
+    font-size: 26px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+  .opt small { font-size: 16px; font-weight: 500; }
+  .opt.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .fine { display: flex; align-items: center; justify-content: center; gap: 24px; }
+  .fine button { width: 96px; height: 96px; border-radius: 48px; border: 3px solid var(--ink); background: var(--card); color: var(--ink); font-size: 40px; font-weight: 700; }
+  #blevel { min-width: 180px; text-align: center; font-size: 56px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .pnote { font-size: 19px; color: var(--sub); line-height: 1.5; }
+
+  #settings { position: fixed; inset: 0; z-index: 25; background: var(--bg); display: none; padding: 24px 32px 32px; flex-direction: column; gap: 20px; overflow: auto; }
+  #settings.show { display: flex; }
+  .shead { display: flex; align-items: center; gap: 20px; }
+  .shead h2 { margin: 0; font-size: 40px; font-weight: 900; }
+  .back { height: 64px; padding: 0 24px 0 16px; border-radius: 18px; border: 2px solid var(--ink); background: var(--card);
+    color: var(--ink); font-size: 24px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .grid { flex: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  .box { border-radius: 24px; background: var(--card); padding: 26px 28px; display: flex; flex-direction: column; gap: 12px; }
+  .box h3 { margin: 0; font-size: 28px; font-weight: 700; }
+  .box p { margin: 0; font-size: 19px; color: var(--sub); }
+  .choices { margin-top: auto; display: grid; gap: 12px; }
+  .row { display: flex; align-items: center; justify-content: space-between; font-size: 22px; }
+  .row b.on { color: var(--ok); } .row b.off { color: #5A6372; }
+  .test { margin-top: auto; height: 96px; border-radius: 18px; border: 0; background: var(--blue); color: #fff;
+    font-size: 26px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 12px; }
+  #toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 50; padding: 14px 24px; border-radius: 14px;
+    background: var(--ink); color: #fff; font-size: 22px; font-weight: 700; display: none; }
+
+  /* スマホ・小さい画面 */
+  @media (max-width: 900px) {
+    html, body { overflow: auto; }
+    .page { height: auto; min-height: 100%; }
+    header { padding: 0 16px; height: 60px; } .title { font-size: 18px; } .hright { gap: 14px; font-size: 16px; }
+    #notif { display: none; } #clock { font-size: 22px; } .iconbtn { width: 48px; height: 48px; }
+    main { flex-direction: column; padding: 0 16px 16px; gap: 14px; }
+    .video { flex: none; aspect-ratio: 16 / 9; }
+    .badge { font-size: 15px; padding: 6px 12px; } .badge.live { left: 12px; top: 12px; } .badge.head { right: 12px; bottom: 12px; font-size: 14px; }
+    .card, .acard { flex: none; padding: 20px; } .card .big { font-size: 38px; } .card .msg { font-size: 20px; }
+    .card svg.cicon { width: 52px; height: 52px; } .card .foot { margin-top: 8px; }
+    .acard .big { font-size: 34px; } .acard .sec b { font-size: 80px; } .ack { height: 96px; font-size: 28px; }
+    .milk { height: 92px; } .milk .t { font-size: 26px; } .btn { height: 76px; font-size: 17px; }
+    .grid { grid-template-columns: 1fr; } .levels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #settings { padding: 16px; } .shead h2 { font-size: 30px; } .phead h2 { font-size: 28px; } .panel { padding: 22px; }
+    #nclock { font-size: 96px; } .pill { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div class="title" id="title">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 4l9 6.5"/><path d="M5 9.5V20h14V9.5"/><circle cx="12" cy="14" r="2.5"/></svg>
+      <span id="titletext">見守りカメラ</span>
+    </div>
+    <div class="hright">
+      <span id="notif"></span>
+      <span id="clock">--:--</span>
+      <button class="iconbtn" id="openSettings" aria-label="設定">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1D2430" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+    </div>
+  </header>
+  <main>
+    <div class="video">
+      <img id="video" src="/stream.mjpg" alt="ライブ映像">
+      <div class="badge live"><i></i>ライブ映像</div>
+      <div class="badge head" id="headlabel">頭：カメラ側</div>
+    </div>
+    <div class="side" id="side"></div>
+  </main>
+</div>
+
+<div id="night">
+  <div class="nwhen" id="nwhen"></div>
+  <div id="nclock">--:--</div>
+  <div class="pill" id="npill"><i></i><span>見守り中・顔OK</span></div>
+  <div class="nhint">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11V5a2 2 0 0 1 4 0v6"/><path d="M13 10a2 2 0 0 1 4 0v2a8 8 0 0 1-8 8 6 6 0 0 1-5.6-3.9L2 13a1.5 1.5 0 0 1 2.6-1.5L7 14V9"/></svg>
+    画面に触れると明るくなります
+  </div>
+</div>
+<div id="dim"></div>
+
+<div class="sheet" id="brightSheet" role="dialog" aria-modal="true" aria-labelledby="btitle">
+  <div class="panel">
+    <div class="phead"><h2 id="btitle">画面の明るさ</h2><button class="close" data-close="brightSheet">閉じる</button></div>
+    <div class="levels" id="levels"></div>
+    <div class="fine">
+      <button id="bminus" aria-label="暗く">−</button>
+      <div id="blevel">--%</div>
+      <button id="bplus" aria-label="明るく">＋</button>
+    </div>
+    <div class="pnote" id="bnote"></div>
+  </div>
+</div>
+
+<div id="settings" role="dialog" aria-modal="true" aria-labelledby="stitle">
+  <div class="shead">
+    <button class="back" id="closeSettings">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>戻る</button>
+    <h2 id="stitle">設定</h2>
+  </div>
+  <div class="grid">
+    <div class="box">
+      <h3>赤ちゃんの頭の向き</h3>
+      <p>カメラ側か反対側かで、映像を上下に回します</p>
+      <div class="choices" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+        <button class="opt" data-set="head" data-v="camera">カメラ側</button>
+        <button class="opt" data-set="head" data-v="opposite">反対側</button>
+      </div>
+    </div>
+    <div class="box">
+      <h3>お知らせまでの時間</h3>
+      <p>顔が見えなくなってから、通知するまでの秒数</p>
+      <div class="choices" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+        <button class="opt" data-set="absent_sec" data-v="10">10秒</button>
+        <button class="opt" data-set="absent_sec" data-v="15">15秒<small>おすすめ</small></button>
+        <button class="opt" data-set="absent_sec" data-v="30">30秒</button>
+      </div>
+    </div>
+    <div class="box">
+      <h3>夜の画面</h3>
+      <p id="nightdesc">夜は画面を暗くします（アラートのときは明るく）</p>
+      <div class="choices" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+        <button class="opt" data-set="night_mode" data-v="dim">暗くする</button>
+        <button class="opt" data-set="night_mode" data-v="off">消す</button>
+        <button class="opt" data-set="night_mode" data-v="none">そのまま</button>
+      </div>
+    </div>
+    <div class="box">
+      <h3>通知</h3>
+      <div class="row"><span>Discord</span><b id="ndiscord"></b></div>
+      <div class="row"><span>メール</span><b id="nmail"></b></div>
+      <button class="test" id="testNotify">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>
+        テスト通知を送る</button>
+    </div>
+  </div>
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const ICON = {
+  ok: '<svg class="cicon" width="84" height="84" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m7.5 12.5 3 3 6-6.5"/></svg>',
+  search: '<svg class="cicon" width="84" height="84" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>',
+  pause: '<svg class="cicon" width="84" height="84" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M10 8.5v7M14 8.5v7"/></svg>',
+  cam: '<svg class="cicon" width="84" height="84" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h4l2-3h6l2 3h4v13H3z"/><path d="m3 3 18 18"/></svg>',
+  warn: '<svg class="cicon" width="84" height="84" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 21h20z"/><path d="M12 10v5M12 18v.5"/></svg>',
+  milk: '<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 2h6"/><path d="M10 2v3l-2 3v12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V8l-2-3V2"/><path d="M8 12h8"/></svg>',
+  pauseS: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 5v14"/><path d="M15 5v14"/></svg>',
+  play: '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>',
+  head: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4 3 8l4 4"/><path d="M3 8h13a5 5 0 0 1 0 10h-3"/></svg>',
+  sun: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  bell: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>',
+  alert: '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 21h20z"/><path d="M12 10v5M12 18v.5"/></svg>',
+  eye: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+};
+
+let S = null;            // 最後に受け取った状態
+let online = false;
+let awakeUntil = 0;      // 夜の画面・画面オフから起こした期限
+let screenOff = false;   // 明るさパネルの「消す」
+let sentLevel = null;    // 最後にラズパイへ送った明るさ
+let sideKey = '';
+
+function hm(d) { return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); }
+function dur(sec) {
+  if (sec == null) return '';
+  const m = Math.floor(sec / 60), h = Math.floor(m / 60);
+  return h > 0 ? h + '時間' + (m % 60) + '分' : (m > 0 ? m + '分' : '1分未満');
+}
+function toMin(s) { const [h, m] = String(s || '0:0').split(':').map(Number); return h * 60 + (m || 0); }
+function isNight() {
+  if (!S) return false;
+  const st = S.settings, now = new Date(), t = now.getHours() * 60 + now.getMinutes();
+  const a = toMin(st.night_start), b = toMin(st.night_end);
+  return a <= b ? (t >= a && t < b) : (t >= a || t < b);
+}
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = 'none', 2500); }
+async function post(path, body) {
+  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  return r.json();
+}
+
+/* ---------- 右側の表示 ---------- */
+function milkButton() {
+  const m = S && S.milk_last;
+  return '<a class="milk" href="/milk">' + ICON.milk + '<span style="display:flex;flex-direction:column;gap:2px">' +
+    '<span class="t">ミルク</span><span class="s">' + (m ? '前回 ' + m.ago_text + '・' + m.amount + 'ml' : 'まだ記録がありません') + '</span></span></a>';
+}
+function buttons(st) {
+  const paused = st.phase === 'PAUSED' || st.phase === 'NO_CAMERA';
+  const local = S && S.local;
+  const arm = paused
+    ? '<button class="btn primary" data-act="arm">' + ICON.play + '見守り開始</button>'
+    : '<button class="btn dark" data-act="disarm">' + ICON.pauseS + '一時停止</button>';
+  const head = '<button class="btn" data-act="head">' + ICON.head + '頭の向き</button>';
+  const bright = local ? '<button class="btn" data-act="bright">' + ICON.sun + '明るさ</button>' : '';
+  return '<div class="btns' + (local ? '' : ' two') + '">' + arm + head + bright + '</div>';
+}
+function renderSide() {
+  const st = (S && S.status) || {};
+  let html, key;
+  document.body.classList.toggle('alert', online && st.phase === 'ALERT');
+  if (!online) {
+    key = 'offline';
+    html = '<div class="card gray">' + ICON.warn + '<div class="big">通信できません</div><div class="msg">見守りカメラの<br>プログラムにつながりません。<br>自動で再接続します。</div></div>';
+  } else if (st.phase === 'ALERT') {
+    key = 'alert' + st.acked + Math.floor(st.absent_sec || 0);
+    const n = S.notify, sent = (n.discord || n.mail) ? 'スマホに通知しました' : '通知先が未設定です';
+    html = '<div class="acard"><div class="big">顔が<br>見えません</div>' +
+      '<div class="sec"><b>' + Math.floor(st.absent_sec || 0) + '</b><span>秒</span></div>' +
+      '<div class="sent">' + ICON.bell + sent + '</div></div>' +
+      (st.acked
+        ? '<div class="ack" style="background:#fff;color:#1D2430;font-size:26px">再通知を止めています</div><div class="anote">顔が見えると、自動で見守りに戻ります</div>'
+        : '<button class="ack" data-act="ack">' + ICON.eye + '様子を見ました</button><div class="anote">押すと再通知を止めて、顔が見えるまで待ちます</div>');
+  } else {
+    let card;
+    if (st.phase === 'WATCHING' && st.face_visible) {
+      card = '<div class="card">' + ICON.ok + '<div class="big">見守り中</div><div class="msg">赤ちゃんの顔が<br>見えています</div>' +
+        '<div class="foot">見守り開始から<b>' + dur(st.armed_sec) + '</b></div></div>';
+    } else if (st.phase === 'WATCHING') {
+      const left = Math.max(0, Math.ceil(st.absent_limit - st.absent_sec));
+      card = '<div class="card warn">' + ICON.search + '<div class="big">顔を探しています</div><div class="msg">見えない時間 ' + Math.floor(st.absent_sec) + '秒</div>' +
+        '<div class="foot">あと<b>' + left + '秒で通知します</b></div></div>';
+    } else if (st.phase === 'WAITING') {
+      const p = Math.min(100, Math.round(100 * st.confirm_progress / st.confirm_sec));
+      card = '<div class="card wait">' + ICON.search + '<div class="big">顔を確認中</div>' +
+        '<div class="bar"><div style="width:' + p + '%"></div></div><div class="count">' + Math.floor(st.confirm_progress) + ' / ' + st.confirm_sec + ' 秒</div>' +
+        '<div class="foot">顔が' + st.confirm_sec + '秒見えたら<br>見守りを始めます。<br>この間は通知しません。</div></div>';
+    } else if (st.phase === 'PAUSED') {
+      card = '<div class="card gray">' + ICON.pause + '<div class="big">一時停止中</div><div class="msg">通知はしません。<br>寝かせたら「見守り開始」を<br>押してください。</div></div>';
+    } else if (st.phase === 'NO_CAMERA') {
+      card = '<div class="card gray">' + ICON.cam + '<div class="big">カメラが<br>見つかりません</div><div class="msg">ケーブルを確認してください。<br>見つかり次第、自動で始めます。</div></div>';
+    } else {
+      card = '<div class="card gray">' + ICON.search + '<div class="big">起動中…</div></div>';
+    }
+    key = card + (S.milk_last ? S.milk_last.ago_text : '') + S.local;
+    html = card + milkButton() + buttons(st);
+  }
+  if (key !== sideKey) { $('side').innerHTML = html; sideKey = key; }
+  $('titletext').textContent = online && st.phase === 'ALERT' ? 'アラート　すぐに様子を見てください' : '見守りカメラ';
+  const n = S ? S.notify : null;
+  $('notif').innerHTML = n ? ICON.bell + ((n.discord || n.mail) ? (st.phase === 'PAUSED' ? '通知 停止中' : '通知 オン') : '通知 未設定') : '';
+  $('headlabel').textContent = '頭：' + (S && S.settings.head === 'opposite' ? '反対側' : 'カメラ側');
+}
+
+/* ---------- 夜の画面と明るさ（ラズパイの画面のときだけ） ---------- */
+function awake() { return Date.now() < awakeUntil; }
+function wake() { awakeUntil = Date.now() + 1000 * ((S && S.settings.wake_sec) || 30); screenOff = false; applyDisplay(); }
+function nightActive() { return S && isNight() && S.settings.night_mode !== 'none'; }
+function targetLevel() {
+  const st = S.status || {}, set = S.settings;
+  if (st.phase === 'ALERT') return 100;
+  if (screenOff && !awake()) return 0;
+  if (nightActive()) {
+    if (!awake()) return set.night_mode === 'off' ? 0 : set.brightness_night;
+    return Math.max(set.brightness_night, 30);
+  }
+  return set.brightness_day;
+}
+function applyDisplay() {
+  if (!S || !S.local) { $('night').classList.remove('show'); $('dim').style.opacity = 0; return; }
+  const st = S.status || {}, alert = st.phase === 'ALERT';
+  if (alert) { awakeUntil = Date.now() + 5000; screenOff = false; }
+  const level = targetLevel();
+  const showNight = !alert && !awake() && (screenOff || nightActive());
+  const n = $('night');
+  n.classList.toggle('show', showNight);
+  n.classList.toggle('off', showNight && level === 0);
+  if (showNight) {
+    $('nclock').textContent = hm(new Date());
+    $('nwhen').textContent = screenOff ? '画面オフ' : '夜の画面 ' + S.settings.night_start + '〜' + S.settings.night_end;
+    const ok = st.phase === 'WATCHING' && st.face_visible;
+    const txt = ok ? '見守り中・顔OK' : st.phase === 'WAITING' ? '顔を確認中' : st.phase === 'PAUSED' ? '一時停止中' : st.phase === 'WATCHING' ? '顔を探しています' : 'カメラを確認してください';
+    $('npill').innerHTML = '<i style="background:' + (ok ? '#2E9A66' : '#B88A2E') + '"></i><span>' + txt + '</span>';
+  }
+  // ハードの明るさ。変えられない画面では、黒い幕を重ねて暗く見せる
+  if (S.backlight.writable) {
+    $('dim').style.opacity = 0;
+    if (level !== sentLevel) { sentLevel = level; post('/api/brightness', { level: level }).catch(() => { sentLevel = null; }); }
+  } else {
+    $('dim').style.opacity = showNight ? 0 : (100 - Math.max(level, 5)) / 100 * 0.85;
+  }
+}
+// 夜の画面・画面オフのときは、触ると起きる（その操作はボタンに伝えない）
+let swallow = 0;
+document.addEventListener('pointerdown', (e) => {
+  if ($('night').classList.contains('show')) { e.preventDefault(); e.stopPropagation(); swallow = Date.now() + 800; wake(); return; }
+  if (awake()) awakeUntil = Date.now() + 1000 * ((S && S.settings.wake_sec) || 30);
+}, true);
+document.addEventListener('click', (e) => { if (Date.now() < swallow) { e.preventDefault(); e.stopPropagation(); swallow = 0; } }, true);
+
+/* ---------- 明るさパネル ---------- */
+const LEVELS = [[0, '消す', 'さわると点灯'], [10, '暗い', '10%'], [50, 'ふつう', '50%'], [100, '明るい', '100%']];
+function brightKey() { return nightActive() ? 'brightness_night' : 'brightness_day'; }
+function renderBright() {
+  const cur = S.settings[brightKey()];
+  $('levels').innerHTML = LEVELS.map(([v, t, s]) => '<button class="opt' + (v > 0 && v === cur ? ' on' : '') + '" data-level="' + v + '">' + t + '<small>' + s + '</small></button>').join('');
+  $('blevel').textContent = cur + '%';
+  $('bnote').textContent = (nightActive() ? '夜（' + S.settings.night_start + '〜' + S.settings.night_end + '）' : '昼') + 'の明るさを変えます。次からもこの明るさになります。' +
+    (S.backlight.writable ? '' : '（液晶の明るさを変える権限がないため、画面を暗く見せています）');
+}
+async function setLevel(v) {
+  v = Math.max(5, Math.min(100, v));
+  const j = await post('/api/settings', { [brightKey()]: v });
+  if (j.ok) { S = { ...S, ...j, local: S.local }; renderBright(); applyDisplay(); }
+}
+$('levels').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-level]'); if (!b) return;
+  const v = +b.dataset.level;
+  if (v === 0) { $('brightSheet').classList.remove('show'); screenOff = true; awakeUntil = 0; applyDisplay(); return; }
+  setLevel(v);
+});
+$('bminus').onclick = () => setLevel(S.settings[brightKey()] - 10);
+$('bplus').onclick = () => setLevel(S.settings[brightKey()] + 10);
+
+/* ---------- 設定画面 ---------- */
+function renderSettings() {
+  document.querySelectorAll('#settings [data-set]').forEach((b) => {
+    const k = b.dataset.set, v = S.settings[k];
+    b.classList.toggle('on', String(k === 'absent_sec' ? Number(v) : v) === b.dataset.v);
+  });
+  $('nightdesc').textContent = S.settings.night_start + '〜' + S.settings.night_end + ' の画面（アラートのときは明るく）';
+  const d = $('ndiscord'), m = $('nmail');
+  d.textContent = S.notify.discord ? 'オン' : '未設定'; d.className = S.notify.discord ? 'on' : 'off';
+  m.textContent = S.notify.mail ? 'オン' : '未設定'; m.className = S.notify.mail ? 'on' : 'off';
+}
+$('settings').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-set]'); if (!b) return;
+  const j = await post('/api/settings', { [b.dataset.set]: b.dataset.v });
+  if (j.ok) { S = { ...S, ...j, local: S.local }; renderSettings(); renderSide(); toast('変更しました'); }
+});
+$('openSettings').onclick = () => { if (!S) return; renderSettings(); $('settings').classList.add('show'); };
+$('closeSettings').onclick = () => $('settings').classList.remove('show');
+$('testNotify').onclick = async () => { await post('/api/test-notify'); toast('テスト通知を送りました'); };
+document.querySelectorAll('[data-close]').forEach((b) => b.onclick = () => $(b.dataset.close).classList.remove('show'));
+$('brightSheet').addEventListener('click', (e) => { if (e.target === $('brightSheet')) $('brightSheet').classList.remove('show'); });
+
+/* ---------- 右側のボタン ---------- */
+$('side').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act;
+  if (act === 'arm' || act === 'disarm') { await fetch('/' + act, { method: 'POST' }); setTimeout(poll, 300); }
+  else if (act === 'ack') { await post('/api/ack'); setTimeout(poll, 300); }
+  else if (act === 'head') {
+    const v = S.settings.head === 'opposite' ? 'camera' : 'opposite';
+    const j = await post('/api/settings', { head: v });
+    if (j.ok) { S = { ...S, ...j, local: S.local }; renderSide(); toast('頭の向き：' + (v === 'opposite' ? '反対側' : 'カメラ側')); }
+  } else if (act === 'bright') { renderBright(); $('brightSheet').classList.add('show'); }
+});
+
+/* ---------- 定期更新 ---------- */
+async function poll() {
+  try {
+    const r = await fetch('/api/state', { cache: 'no-store' });
+    S = await r.json(); online = true;
+  } catch (e) { online = false; }
+  renderSide();
+  if (S) applyDisplay();
+}
+function tick() { const d = new Date(); $('clock').textContent = hm(d); if ($('night').classList.contains('show')) $('nclock').textContent = hm(d); }
+$('video').onerror = () => setTimeout(() => { $('video').src = '/stream.mjpg?t=' + Date.now(); }, 3000);
+tick(); setInterval(tick, 5000);
+poll(); setInterval(poll, 1000);
+</script>
+</body>
+</html>

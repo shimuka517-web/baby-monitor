@@ -4,6 +4,7 @@
 #    cd ~/baby-monitor && bash scripts/install-service.sh
 #  ユーザー名とフォルダの場所は自動で埋め込まれます。
 #  解除するとき： sudo systemctl disable --now baby-monitor
+#  もう一度実行しても大丈夫です（更新後や、明るさ調整の権限を付けるとき）
 # =====================================================================
 set -euo pipefail
 
@@ -21,8 +22,15 @@ pkill -f "$DIR/baby_monitor.py" 2>/dev/null || true
 
 sed -e "s#__USER__#${USER_NAME}#g" -e "s#__DIR__#${DIR}#g" \
   "$DIR/systemd/baby-monitor.service.template" | sudo tee "$DEST" > /dev/null
+# 液晶の明るさを画面から変えられるようにする（バックライトの書き込み権限）
+sudo install -m 644 "$DIR/systemd/99-baby-monitor-backlight.rules" /etc/udev/rules.d/
+sudo usermod -aG video "$USER_NAME"
+sudo udevadm control --reload
+sudo udevadm trigger --subsystem-match=backlight --action=add || true
+
 sudo systemctl daemon-reload
-sudo systemctl enable --now baby-monitor
+sudo systemctl enable baby-monitor
+sudo systemctl restart baby-monitor
 
 echo
 echo "登録しました（ユーザー: ${USER_NAME} / 場所: ${DIR}）"

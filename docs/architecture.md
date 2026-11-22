@@ -59,7 +59,8 @@
 | `notify` / `_send_discord` / `_send_gmail` | 通知の送信。設定されている送信先にだけ送る |
 | `FaceDetector` | OpenCV YuNet による顔検出。横向きの顔は画像を回転させて探し、座標を元に戻す |
 | `Monitor` | 見守りの状態遷移（上の表）。カメラや画面に依存しない |
-| `Handler` / `StreamingServer` / `PAGE` | ブラウザ配信。`/` 画面、`/stream.mjpg` 映像、`/status` 状態、`/snapshot.jpg` 静止画、`/arm` `/disarm` 開始・停止 |
+| `Handler` / `StreamingServer` | ブラウザ配信。`/` タッチ画面（`web/index.html`）、`/milk` ミルク、`/stream.mjpg` 映像、`/api/state` 状態、`/snapshot.jpg` 静止画、`/arm` `/disarm` 開始・停止、`/api/ack` `/api/settings` `/api/brightness` `/api/test-notify` |
+| `Backlight` | 液晶のバックライト（`/sys/class/backlight`）の明るさを 0〜100% で変える |
 | `draw_overlay` | 枠・日時・状態の描き込み |
 | `main` | 上記を組み合わせたメインループ |
 | `test_notify` | `--test-notify` で起動したとき、カメラを使わずにテスト通知だけ送る |
