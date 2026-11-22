@@ -47,6 +47,17 @@
 
 ---
 
+## ラズパイの画面に全画面で出す（起動時に自動）
+ベッド横の画面（8インチのタッチ液晶など）に、電源を入れたら見守り画面が全画面で出るようにできます。
+```bash
+cd ~/baby-monitor && bash scripts/install-kiosk.sh
+sudo reboot
+```
+- 前提：デスクトップ版の Raspberry Pi OS で、自動ログインが有効なこと（`sudo raspi-config` → System Options → Boot / Auto Login → Desktop Autologin）
+- 全画面を抜けるとき：キーボードで Alt+F4、または SSH で `pkill -f chromium`
+- 解除：`bash scripts/install-kiosk.sh --remove`
+- ブラウザで自分で開くときは、`http://localhost:8000/` のように **`http://` から**入力してください（`https://` になると表示できません）
+
 ## 設置後に必ずやるテスト
 
 設置したとき、カメラの位置を変えたとき、設定を変えたときに行います。**できれば月1回**、定期的に行ってください。
