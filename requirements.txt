@@ -2,3 +2,5 @@
 # OpenCV は numpy の互換性のためバージョンを固定（新しい版だと picamera2 が動かないことがある）。
 opencv-python-headless==4.10.0.84
 requests
+# アプリ（ホーム画面に追加したダッシュボード）への通知（Web Push）
+pywebpush

@@ -75,6 +75,8 @@ UI_KEYS = {
     "brightness_day": ("display", "brightness_day", lambda v: max(0, min(100, int(v)))),
     "brightness_night": ("display", "brightness_night", lambda v: max(0, min(100, int(v)))),
     "env_alert": ("env", "alert", lambda v: v if isinstance(v, bool) else str(v).lower() in ("1", "true", "on")),
+    "discord_alert": (None, "discord_alert", lambda v: v if isinstance(v, bool) else str(v).lower() in ("1", "true", "on")),
+    "discord_env": (None, "discord_env", lambda v: v if isinstance(v, bool) else str(v).lower() in ("1", "true", "on")),
     "head": (None, "head", lambda v: (LEGACY_HEAD.get(v, v) if LEGACY_HEAD.get(v, v) in HEAD_ROTATE else None)),
 }
 # 赤ちゃんの頭の向き（カメラの側から見て）→ 映像を回す角度（時計回り）
@@ -278,9 +280,23 @@ def notify_sync(text, jpeg=None):
     _send_gmail(text, jpeg)
 
 
-def notify(text, jpeg=None):
-    """メインループを止めないよう別スレッドで送信"""
-    threading.Thread(target=notify_sync, args=(text, jpeg), daemon=True).start()
+PUSH = None   # push.Push（アプリへの通知。main() で用意）
+PUSH_STYLE = {   # 種類ごとの、アプリ通知のタイトルと開く画面
+    "alert": ("見守りカメラ", "/cam"),
+    "env": ("お部屋の温度・湿度", "/dash#roomCard"),
+}
+
+
+def notify(text, jpeg=None, kind="system"):
+    """通知を送る（メインループを止めないよう別スレッドで）。
+    kind: "alert"（見守りアラート）／"env"（お部屋の暑い・寒い）／"system"（起動・異常など）
+    alert と env は、画面の設定に従ってアプリ（Web Push）と Discord/Gmail に振り分ける"""
+    to_discord = kind == "system" or cfg.ui.get("discord_" + kind, True)
+    if to_discord:
+        threading.Thread(target=notify_sync, args=(text, jpeg), daemon=True).start()
+    if PUSH is not None and kind in PUSH_STYLE:
+        title, url = PUSH_STYLE[kind]
+        PUSH.send_async(kind, title, text, url=url, tag=kind)
 
 
 # ================================================================ 顔検出 (OpenCV YuNet)
@@ -495,7 +511,7 @@ def init_home():
     sb, e = cfg.secrets["switchbot"], cfg.s["env"]
     if e["enabled"] and sb["token"] and sb["secret"]:
         ENV = home_env.EnvMonitor(home_env.SwitchBot(sb["token"], sb["secret"], e["device_id"]), LOGBOOK,
-                                  lambda: cfg.s["env"], notify, poll_sec=max(60, e["poll_sec"]))
+                                  lambda: cfg.s["env"], lambda m: notify(m, kind="env"), poll_sec=max(60, e["poll_sec"]))
         ENV.start()
         log.info("部屋の温湿度: SwitchBot から %d 秒ごとに取得します", e["poll_sec"])
     else:
@@ -525,6 +541,43 @@ def is_home_network(ip):
     if any(a in n for n in TAILSCALE_NETS):
         return False
     return a.is_loopback or a.is_private or a.is_link_local
+
+
+_TS_CACHE = {"t": 0.0, "peers": {}}
+
+
+def tailscale_peers_at_home(status_json, lan):
+    """`tailscale status --json` の結果から、家のLANで直接つながっている端末の Tailscale IP の集合を返す。
+    （家のWi-Fiにいるスマホは、Tailscale の通り道が 192.168.x.x の直接接続になる。外出先では携帯回線や中継になる）"""
+    home = set()
+    try:
+        lan_net = ipaddress.ip_network(lan + "/24", strict=False) if lan else None
+    except ValueError:
+        lan_net = None
+    for peer in (status_json.get("Peer") or {}).values():
+        addr = peer.get("CurAddr") or ""
+        host = addr.rsplit(":", 1)[0].strip("[]") if addr else ""
+        try:
+            a = ipaddress.ip_address(host)
+        except ValueError:
+            continue
+        if lan_net is not None and a.version == 4 and a in lan_net:
+            home.update(peer.get("TailscaleIPs") or [])
+    return home
+
+
+def at_home_via_tailscale(ip):
+    """Tailscale 経由のアクセスでも、その端末が家のWi-Fiにいれば True（10秒キャッシュ）"""
+    now = time.monotonic()
+    if now - _TS_CACHE["t"] > 10:
+        _TS_CACHE["t"] = now
+        try:
+            import subprocess
+            out = subprocess.run(["tailscale", "status", "--json"], capture_output=True, text=True, timeout=3)
+            _TS_CACHE["peers"] = tailscale_peers_at_home(json.loads(out.stdout or "{}"), LAN_IP) if out.returncode == 0 else set()
+        except Exception:
+            _TS_CACHE["peers"] = set()
+    return ip in _TS_CACHE["peers"]
 
 
 def lan_ip():
@@ -571,7 +624,8 @@ class Handler(server.BaseHTTPRequestHandler):
         return ip
 
     def _at_home(self):
-        return is_home_network(self._client_ip())
+        ip = self._client_ip()
+        return is_home_network(ip) or at_home_via_tailscale(ip)
 
     def _camera_info(self):
         return {"here": self._camera_ok(), "lan_url": (f"http://{LAN_IP}:{cfg.s['web']['port']}" if LAN_IP else "")}
@@ -608,6 +662,16 @@ class Handler(server.BaseHTTPRequestHandler):
             self._file("dash.html")
         elif path == "/cam":
             self._file("cam.html")
+        elif path == "/sw.js":
+            with open(os.path.join(WEB_DIR, "sw.js"), "rb") as f:
+                body = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.send_header("Service-Worker-Allowed", "/")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         elif path in STATIC:
             self._file(path.lstrip("/"), STATIC[path])
         elif path == "/api/dash":
@@ -676,6 +740,30 @@ class Handler(server.BaseHTTPRequestHandler):
         elif self.path == "/api/test-notify":
             notify("🔔 見守りカメラのテスト通知です（画面の「設定」から送りました）。")
             self._json(200, {"ok": True})
+        elif self.path.startswith("/api/push/"):
+            try:
+                body = self._body()
+                if PUSH is None:
+                    raise ValueError("アプリ通知の準備ができていません")
+                ep = str(body.get("endpoint") or "")
+                if self.path == "/api/push/status":
+                    out = PUSH.public_info(ep or None)
+                elif self.path == "/api/push/subscribe":
+                    out = PUSH.subscribe(body.get("subscription"), body.get("kinds"), body.get("name", ""))
+                    PUSH.send_async("test", "育児の記録", "このスマホで通知を受け取れるようになりました 🎉", url="/dash", only=body["subscription"]["endpoint"])
+                elif self.path == "/api/push/update":
+                    out = PUSH.update(ep, body.get("kinds"))
+                elif self.path == "/api/push/unsubscribe":
+                    PUSH.unsubscribe(ep); out = PUSH.public_info()
+                elif self.path == "/api/push/test":
+                    n = PUSH.send("test", "テスト通知", "アプリの通知はこのように届きます", url="/dash", only=ep)
+                    out = {**PUSH.public_info(ep), "sent": n}
+                else:
+                    self._send(404, "text/plain", b"not found")
+                    return
+                self._json(200, {"ok": True, **out, "routes": {k: cfg.ui.get(k, True) for k in ("discord_alert", "discord_env")}})
+            except (ValueError, KeyError, TypeError) as e:
+                self._json(400, {"ok": False, "error": str(e).strip("'\"")})
         elif self.path in ("/api/diaper", "/api/diaper/undo", "/api/weight", "/api/weight/delete"):
             try:
                 body = self._body()
@@ -906,6 +994,10 @@ def main():
     LAN_IP = lan_ip()
     log.info("家のネットワークでのアドレス: %s（カメラは%s）", LAN_IP or "不明",
              "家のWi-Fiからだけ" if cfg.s["web"]["camera_lan_only"] else "どこからでも")
+    global PUSH
+    from push import Push
+    PUSH = Push(DATA_DIR)
+    log.info("アプリ通知: %s（登録 %d 台）", "使えます" if PUSH.available else "使えません", len(PUSH.subs))
     init_milk()
     init_home()
     httpd = StreamingServer(("", web_cfg["port"]), Handler)
@@ -963,14 +1055,14 @@ def main():
             elif ev in ("alert", "repeat"):
                 sec = mon.absent_sec(now)
                 log.warning("顔が %.0f 秒見えません。通知します", sec)
-                notify(f"⚠️ 赤ちゃんの顔が {sec:.0f} 秒間見えていません。すぐに様子を確認してください。", jpeg)
+                notify(f"⚠️ 赤ちゃんの顔が {sec:.0f} 秒間見えていません。すぐに様子を確認してください。", jpeg, kind="alert")
             elif ev == "recovered":
                 log.info("顔が再び見えるようになりました")
-                notify("✅ 赤ちゃんの顔が再び見えるようになりました。", jpeg)
+                notify("✅ 赤ちゃんの顔が再び見えるようになりました。", jpeg, kind="alert")
             elif ev == "waiting_long":
                 log.warning("見守り開始から %.0f 秒、顔を確認できていません", a["waiting_notify_sec"])
                 notify(f"ℹ️ 見守りを始めてから {a['waiting_notify_sec'] / 60:.0f} 分、まだ一度も顔を確認できていません。"
-                       "カメラの向きや赤ちゃんの様子を確認してください。", jpeg)
+                       "カメラの向きや赤ちゃんの様子を確認してください。", jpeg, kind="alert")
 
         frames += 1
         if now - t_fps >= 5:

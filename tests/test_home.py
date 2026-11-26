@@ -214,6 +214,18 @@ class TestHomeNetwork(unittest.TestCase):
             self.assertEqual(bm.is_home_network(ip), home, ip)
 
 
+class TestTailscaleAtHome(unittest.TestCase):
+    def test_direct_lan_peer_is_home(self):
+        import baby_monitor as bm
+        st = {"Peer": {
+            "a": {"TailscaleIPs": ["100.101.1.1", "fd7a:115c:a1e0::1"], "CurAddr": "192.168.10.55:41641"},   # 家のWi-Fi
+            "b": {"TailscaleIPs": ["100.101.1.2"], "CurAddr": "203.0.113.9:41641"},                            # 携帯回線
+            "c": {"TailscaleIPs": ["100.101.1.3"], "CurAddr": ""},                                              # 中継
+            "d": {"TailscaleIPs": ["100.101.1.4"], "CurAddr": "[2001:db8::1]:41641"}}}
+        self.assertEqual(bm.tailscale_peers_at_home(st, "192.168.10.138"), {"100.101.1.1", "fd7a:115c:a1e0::1"})
+        self.assertEqual(bm.tailscale_peers_at_home(st, ""), set())
+
+
 class TestWeather(unittest.TestCase):
     def test_parse(self):
         j = {"current": {"temperature_2m": 12.34, "relative_humidity_2m": 55, "weather_code": 2},

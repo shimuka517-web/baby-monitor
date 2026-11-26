@@ -85,6 +85,36 @@ sudo tailscale serve --bg 8000
 ```
 とすると、`https://raspberrypi.<あなたのtailnet名>.ts.net/dash` で開けます（Tailscale の中だけ）。
 
+## 1-2. アプリの通知（見守りアラート・お部屋の暑い・寒い）
+ホーム画面に追加したアプリに、ラズパイから直接通知を出せます（Web Push）。ロック画面に出て、タップするとカメラ画面やダッシュボードが開きます。
+**アプリを閉じていても、スマホの Tailscale がオフでも届きます**（Apple・Google の通知サーバーを通るため）。
+
+スマホのブラウザは **https のページでしか通知を許可しない** ので、Tailscale で https にします。
+
+1. ラズパイに通知用の部品を入れる（最初の1回）
+   ```bash
+   cd ~/baby-monitor && venv/bin/pip install -r requirements.txt
+   sudo systemctl restart baby-monitor
+   ```
+2. Tailscale の管理画面 → **DNS** → **HTTPS Certificates** を「Enable」
+3. ラズパイで（1回だけ。再起動しても続きます）
+   ```bash
+   sudo tailscale serve --bg 8000
+   ```
+   表示された `https://raspberrypi.<あなたのtailnet名>.ts.net/` がアプリのアドレスです
+4. スマホ（Tailscale オン）で `https://raspberrypi.<あなたのtailnet名>.ts.net/dash` を開き、**ホーム画面に追加**（前に追加した http のアイコンは消してOK）
+5. **ホーム画面のアイコンから開いて**、いちばん下の設定 →「**このスマホで通知を受け取る**」→ 許可
+   - iPhone は iOS 16.4 以降で、ホーム画面のアイコンから開いたときだけ使えます
+   - 家族のスマホも、それぞれ同じようにします
+
+設定でできること
+- このスマホに届ける種類：**見守りアラート**（顔が見えない・見えるようになった）／**お部屋の暑い・寒い**
+- **Discord にも送る**：見守りアラート・お部屋の暑い・寒いを、それぞれ Discord にも送るか（アプリだけにしたいときはオフ）
+- 起動・カメラが見つからない・異常停止などのお知らせは、これまでどおり Discord に届きます
+- 見守りアラートの通知は、触るまで消えません
+
+https のアプリから開いても、**家のWi-Fiにいるときはカメラが見られます**（Tailscale の通り道が家のLANの直接接続になっているかで判断します）。外出先では映像は出ません。
+
 ## 2. 部屋の温湿度（SwitchBot ハブ3）
 1. SwitchBot アプリで、ハブ3の設定の **クラウドサービス** がオンになっているか確認
 2. アプリの **プロフィール → 設定（プリファレンス）→ アプリについて → アプリバージョン** を10回ほど続けてタップ → **開発者向けオプション** が出る
@@ -147,5 +177,6 @@ place = "小山市"
 | `logbook.py` | おむつ・体重の記録、温湿度の履歴（`data/logbook.db`、温湿度は30日分）、シートへの送信待ちの列 |
 | `home_env.py` | SwitchBot API（署名つき）から温湿度を取得・範囲外の通知、Open-Meteo から天気 |
 | `web/dash.html` | ダッシュボード画面（グラフはSVGで描くので、外部のライブラリやネットは不要） |
+| `push.py` / `web/sw.js` | アプリへの通知（VAPID鍵 `data/vapid_private.pem`、送り先 `data/push.json`） |
 | `web/cam.html` | スマホ用の見守りカメラ画面（映像は家のLANのアドレスから直接読み込む） |
 | API | `GET /api/dash`、`POST /api/diaper` `/api/diaper/undo` `/api/weight` `/api/weight/delete` |

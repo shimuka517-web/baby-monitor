@@ -622,12 +622,81 @@ async function feedAct(act) {
     toast(r.amount + 'ml を記録（ミルク' + r.milk + '・母乳' + r.breast + '）', r.id, 'feed');
   }
 }
+/* ---------- 設定（いちばん下） ---------- */
+let PS = { ready: false, reason: '', reg: null, sub: null, info: null, routes: { discord_alert: true, discord_env: true } };
+function b64ToU8(s) { const p = '='.repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(b, (c) => c.charCodeAt(0)); }
+async function initPush() {
+  if (!window.isSecureContext) PS.reason = 'https';
+  else if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) PS.reason = /iPhone|iPad/.test(navigator.userAgent) ? 'ios' : 'browser';
+  try {
+    if (!PS.reason) {
+      PS.reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      PS.sub = await PS.reg.pushManager.getSubscription();
+    }
+    const j = await post('/api/push/status', { endpoint: PS.sub ? PS.sub.endpoint : '' });
+    PS.info = j; PS.routes = j.routes || PS.routes;
+    if (!j.available && !PS.reason) PS.reason = 'server';
+  } catch (e) { if (!PS.reason) PS.reason = 'server'; }
+  PS.ready = true;
+  if (D) renderSettings();
+}
+function sw(act, on, label) { return '<button class="sw' + (on ? ' on' : '') + '" data-act="' + act + '" role="switch" aria-checked="' + on + '" aria-label="' + label + '"></button>'; }
+function row(title, sub, act, on) { return '<div class="setrow"><div class="tx"><b>' + title + '</b>' + (sub ? '<span>' + sub + '</span>' : '') + '</div>' + sw(act, on, title) + '</div>'; }
 function renderSettings() {
-  const e = D.env, r = e.range, on = !!e.alert;
-  $('setCard').innerHTML = '<div class="ch"><span style="width:22px;height:22px;color:var(--sub)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></span>設定</div>' +
-    '<div class="setrow"><div class="tx"><b>お部屋の「暑い・寒い」通知</b><span>室温 ' + r.temp_min + '〜' + r.temp_max + '℃・湿度 ' + r.hum_min + '〜' + r.hum_max + '% を外れたら Discord に知らせます</span></div>' +
-    '<button class="sw' + (on ? ' on' : '') + '" data-act="envalert" role="switch" aria-checked="' + on + '" aria-label="お部屋の通知"></button></div>' +
-    '<div class="setnote">オフにしても、画面の「暑い」「寒い」の表示とグラフはそのまま出ます。<br>目安の温度・湿度は、ラズパイの <code>config/settings.toml</code> の <code>[env]</code> で変えられます。</div>';
+  const e = D.env, r = e.range, me = PS.info && PS.info.me;
+  let h = '<div class="ch"><span style="width:22px;height:22px;color:var(--sub)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></span>設定</div>';
+  // このスマホへのアプリ通知
+  h += '<div class="lbl" style="margin:6px 2px">このスマホに通知（アプリ）</div>';
+  if (!PS.ready) h += '<div class="setnote">確認中…</div>';
+  else if (PS.reason) {
+    const why = { https: 'アプリの通知は、<b>https のアドレス</b>で開いたときに使えます。Tailscale を設定して <code>tailscale serve</code> したあと、<code>https://raspberrypi.…ts.net/dash</code> をホーム画面に追加して、そのアイコンから開いてください（docs/home.md）。',
+      ios: 'iPhone では、<b>ホーム画面に追加したアイコンから開いたとき</b>に使えます（iOS 16.4 以降）。Safari の共有ボタン →「ホーム画面に追加」をしてから、アイコンで開いてください。',
+      browser: 'このブラウザはアプリの通知に対応していません。', server: 'ラズパイ側の準備ができていません（<code>venv/bin/pip install -r requirements.txt</code> → 再起動）。' }[PS.reason];
+    h += '<div class="msg note">' + why + '</div>';
+  } else if (!PS.sub || !me) {
+    h += '<button class="save" style="width:100%;background:var(--fab)" data-act="pushon">このスマホで通知を受け取る</button>' +
+      '<div class="setnote">見守りアラート（顔が見えない）とお部屋の「暑い・寒い」を、このスマホに直接お知らせします。アプリを閉じていても、Tailscale がオフでも届きます。</div>';
+  } else {
+    h += row('見守りアラート', '顔が見えないとき・見えるようになったとき', 'pk-alert', me.kinds.alert) +
+      '<div style="height:8px"></div>' + row('お部屋の暑い・寒い', '目安（' + r.temp_min + '〜' + r.temp_max + '℃・' + r.hum_min + '〜' + r.hum_max + '%）を外れたとき', 'pk-env', me.kinds.env) +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><button class="later" style="margin:0" data-act="pushtest">テスト通知</button><button class="later" style="margin:0" data-act="pushoff">このスマホはやめる</button></div>' +
+      '<div class="setnote">通知を受け取るスマホ：' + PS.info.count + '台</div>';
+  }
+  // Discord
+  h += '<div class="lbl" style="margin:14px 2px 6px">Discord にも送る</div>' +
+    row('見守りアラート', '写真つき（Gmail を設定していればメールも）', 'dc-alert', PS.routes.discord_alert !== false) +
+    '<div style="height:8px"></div>' + row('お部屋の暑い・寒い', '', 'dc-env', PS.routes.discord_env !== false);
+  // しきい値の通知そのもの
+  h += '<div class="lbl" style="margin:14px 2px 6px">お部屋</div>' +
+    row('「暑い・寒い」を知らせる', 'オフにすると、アプリにも Discord にも送りません（画面の表示とグラフはそのまま）', 'envalert', !!e.alert) +
+    '<div class="setnote">目安の温度・湿度は、ラズパイの <code>config/settings.toml</code> の <code>[env]</code> で変えられます。起動・異常などのお知らせは、これまでどおり Discord に届きます。</div>';
+  $('setCard').innerHTML = h;
+}
+async function pushAct(act) {
+  if (act === 'pushon') {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { toast('通知が許可されませんでした（スマホの設定から許可できます）'); return; }
+    const sub = await PS.reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(PS.info.key) });
+    const name = /iPhone/.test(navigator.userAgent) ? 'iPhone' : /Android/.test(navigator.userAgent) ? 'Android' : 'その他';
+    PS.info = await post('/api/push/subscribe', { subscription: sub.toJSON(), kinds: { alert: true, env: true }, name });
+    PS.sub = sub; toast('このスマホで通知を受け取れるようになりました');
+  } else if (act === 'pushoff') {
+    if (!confirm('このスマホへの通知をやめますか？')) return;
+    PS.info = await post('/api/push/unsubscribe', { endpoint: PS.sub.endpoint });
+    await PS.sub.unsubscribe().catch(() => {}); PS.sub = null; toast('このスマホへの通知をやめました');
+  } else if (act === 'pushtest') {
+    const j = await post('/api/push/test', { endpoint: PS.sub.endpoint });
+    toast(j.sent ? 'テスト通知を送りました' : '送れませんでした。もう一度「通知を受け取る」からやり直してください');
+  } else if (act === 'pk-alert' || act === 'pk-env') {
+    const k = act.slice(3), me = PS.info.me;
+    PS.info = await post('/api/push/update', { endpoint: PS.sub.endpoint, kinds: { [k]: !me.kinds[k] } });
+  } else if (act === 'dc-alert' || act === 'dc-env') {
+    const k = 'discord_' + act.slice(3), v = !(PS.routes[k] !== false);
+    await post('/api/settings', { [k]: v }); PS.routes[k] = v;
+    toast('Discord への' + (k === 'discord_alert' ? '見守りアラート' : 'お部屋の通知') + 'を' + (v ? 'オン' : 'オフ') + 'にしました');
+  }
+  if (PS.info && PS.info.routes) PS.routes = PS.info.routes;
+  renderSettings();
 }
 $('sheet').addEventListener('click', (e) => { if (e.target === $('sheet')) closeSheet(); });
 document.addEventListener('click', async (e) => {
@@ -639,6 +708,10 @@ document.addEventListener('click', async (e) => {
         await refresh();
         toast('お部屋の通知を' + (D.env.alert ? 'オン' : 'オフ') + 'にしました');
       } catch (err) { toast(err.message); }
+      return;
+    }
+    if (['pushon', 'pushoff', 'pushtest', 'pk-alert', 'pk-env', 'dc-alert', 'dc-env'].includes(act)) {
+      try { await pushAct(act); } catch (err) { toast(err.message || '通知の設定に失敗しました'); }
       return;
     }
     if (['milk', 'feedstart', 'feedlater', 'fminus', 'fplus', 'feedcancel', 'feedfinish'].includes(act)) {
@@ -720,6 +793,7 @@ $('tundo').onclick = async () => {
 function tick() { const d = new Date(); $('clock').textContent = d.getHours() + ':' + two(d.getMinutes()); }
 tick(); setInterval(tick, 10000);
 refresh(); setInterval(refresh, 30000);
+initPush();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 </script>
 </body>
