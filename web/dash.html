@@ -685,7 +685,7 @@ async function refresh() {
 // Tailscale で開いているときは、家のアドレスに小さな確認を送って、届けば家にいると判断する
 async function checkCamera() {
   const c = D.camera || {};
-  if (c.here) { camLink = '/'; return; }
+  if (c.here) { camLink = '/cam'; return; }
   const key = c.lan_url + '|' + Math.floor(Date.now() / 60000);
   if (!c.lan_url || lanChecked === key) return;
   lanChecked = key;
@@ -693,7 +693,7 @@ async function checkCamera() {
     const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 1500);
     const r = await fetch(c.lan_url + '/api/lan', { cache: 'no-store', signal: ctl.signal });
     clearTimeout(tm);
-    camLink = r.ok ? c.lan_url + '/' : null;
+    camLink = r.ok ? '/cam' : null;   // 映像は /cam が家のアドレスから直接読み込む（アプリの中のまま）
   } catch (e) { camLink = null; }
 }
 $('mon').addEventListener('click', (e) => { if (!camLink) { e.preventDefault(); toast('カメラは家のWi-Fiにつないだときだけ見られます'); } });

@@ -573,6 +573,9 @@ class Handler(server.BaseHTTPRequestHandler):
     def _at_home(self):
         return is_home_network(self._client_ip())
 
+    def _camera_info(self):
+        return {"here": self._camera_ok(), "lan_url": (f"http://{LAN_IP}:{cfg.s['web']['port']}" if LAN_IP else "")}
+
     def _camera_ok(self):
         return not cfg.s["web"]["camera_lan_only"] or self._at_home()
 
@@ -603,6 +606,8 @@ class Handler(server.BaseHTTPRequestHandler):
             self._file("milk.html")
         elif path in ("/dash", "/app"):
             self._file("dash.html")
+        elif path == "/cam":
+            self._file("cam.html")
         elif path in STATIC:
             self._file(path.lstrip("/"), STATIC[path])
         elif path == "/api/dash":
@@ -750,7 +755,7 @@ class Handler(server.BaseHTTPRequestHandler):
             "weights": LOGBOOK.weights() if LOGBOOK else [],
             "env": env,
             "weather": WEATHER.summary() if WEATHER else None,
-            "camera": {"here": self._camera_ok(), "lan_url": (f"http://{LAN_IP}:{cfg.s['web']['port']}" if LAN_IP else "")},
+            "camera": self._camera_info(),
             "night": {"start": int(cfg.s["display"]["night_start"].split(":")[0]), "end": int(cfg.s["display"]["night_end"].split(":")[0])},
             "timeline": {"feeds": MILK.since(24) if MILK else [], "diapers": LOGBOOK.diapers_since(24) if LOGBOOK else []},
             "monitor": {"phase": st.get("phase"), "face_visible": st.get("face_visible"), "armed_sec": st.get("armed_sec")},
@@ -773,6 +778,7 @@ class Handler(server.BaseHTTPRequestHandler):
                           "writable": bool(BACKLIGHT and BACKLIGHT.writable),
                           "level": BACKLIGHT.level if BACKLIGHT else None},
             "local": self.client_address[0] in ("127.0.0.1", "::1"),
+            "camera": self._camera_info(),
             "milk_last": ms.get("last"),
             "milk_open": ms.get("open"),
             "milk_today": {k: ms.get("today_" + k, 0) for k in ("total", "milk", "breast", "count")},

@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>見守りカメラ</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FFF7EF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1B1D2B" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FFF7EF; --card: #FFFFFF; --ink: #4A3F3A; --sub: #9A8A82; --line: #F1E6DC; --shadow: 0 4px 14px rgba(196,150,120,.14);
+    --ok: #4FBF95; --ok-bg: #E2F6EE; --ok-ink: #2C8A66;
+    --wait-bg: #FFF4D6; --wait-ink: #9A6A00; --wait: #F2B632;
+    --lost-bg: #FFF0DF; --lost-ink: #B86A12;
+    --gray-bg: #F0ECE8; --gray-ink: #7A6E68;
+    --alert: #E5544B; --alert-bg: #FFE6E3; --alert-ink: #B3261E;
+    --accent: #E85D6C; --on-accent: #FFFFFF; --stage: #2A2D3A;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1B1D2B; --card: #262938; --ink: #F1EAE4; --sub: #A69C98; --line: #34384A; --shadow: 0 4px 14px rgba(0,0,0,.3);
+      --ok: #5ED1A6; --ok-bg: #213A35; --ok-ink: #7FE0BA;
+      --wait-bg: #3B3424; --wait-ink: #F5D27E; --wait: #F5C452;
+      --lost-bg: #3B2F22; --lost-ink: #FFD1A0;
+      --gray-bg: #2E3140; --gray-ink: #B8AEA9;
+      --alert: #FF8A80; --alert-bg: #44262A; --alert-ink: #FFB3AC;
+      --accent: #FF9D9D; --on-accent: #2A1B1F; --stage: #11131C;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink);
+    font-family: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Hiragino Sans", system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
+  body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); transition: background .3s; }
+  html.alert, html.alert body { background: var(--alert-bg); }
+  button, a { font-family: inherit; color: inherit; touch-action: manipulation; }
+  button { cursor: pointer; }
+  button:active, a:active { transform: scale(0.97); }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 10px 14px 24px; display: flex; flex-direction: column; gap: 12px; }
+  header { display: flex; align-items: center; gap: 10px; }
+  .back { display: inline-flex; align-items: center; gap: 4px; height: 42px; padding: 0 14px 0 10px; border-radius: 14px; background: var(--card); box-shadow: var(--shadow);
+    text-decoration: none; font-size: 15px; font-weight: 700; }
+  .back svg { width: 20px; height: 20px; }
+  h1 { margin: 0; font-size: 19px; font-weight: 900; }
+  #clock { margin-left: auto; font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; }
+
+  .stage { position: relative; border-radius: 24px; background: var(--stage); overflow: hidden; aspect-ratio: 16 / 9; box-shadow: var(--shadow); }
+  .stage.portrait { aspect-ratio: 3 / 4; }
+  body.alert .stage { box-shadow: 0 0 0 4px var(--alert); animation: blink 1.2s infinite; }
+  @keyframes blink { 50% { box-shadow: 0 0 0 4px transparent; } }
+  .stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .badge { position: absolute; display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: rgba(0,0,0,.5); color: #fff;
+    font-size: 13px; font-weight: 700; backdrop-filter: blur(4px); }
+  .badge.live { left: 12px; top: 12px; } .badge.live i { width: 9px; height: 9px; border-radius: 5px; background: #FF5A4A; animation: pulse 1.6s infinite; }
+  .badge.head { right: 12px; bottom: 12px; }
+  .full { position: absolute; right: 10px; top: 10px; width: 40px; height: 40px; border-radius: 12px; border: 0; background: rgba(0,0,0,.45); color: #fff; display: flex; align-items: center; justify-content: center; }
+  .full svg { width: 22px; height: 22px; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  .nocam { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #E8E2DC; text-align: center; padding: 20px; }
+  .nocam svg { width: 52px; height: 52px; opacity: .8; }
+  .nocam b { font-size: 17px; } .nocam span { font-size: 13px; opacity: .8; line-height: 1.6; }
+  .stage.off img, .stage.off .badge, .stage.off .full { display: none; } .stage.off .nocam { display: flex; }
+  .row.one { grid-template-columns: 1fr; }
+
+  /* 全画面（横向きで大きく見る） */
+  body.fs .stage { position: fixed; inset: 0; z-index: 30; border-radius: 0; aspect-ratio: auto; }
+  body.fs .stage .full { top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); }
+
+  .status { border-radius: 22px; padding: 16px; display: flex; align-items: center; gap: 14px; box-shadow: var(--shadow); }
+  .status .ic { width: 52px; height: 52px; border-radius: 26px; background: var(--card); display: flex; align-items: center; justify-content: center; flex: none; }
+  .status .ic svg { width: 30px; height: 30px; }
+  .status .tx { min-width: 0; flex: 1; }
+  .status b { display: block; font-size: 24px; font-weight: 900; line-height: 1.2; }
+  .status span { font-size: 14px; font-weight: 700; opacity: .85; }
+  .status .bar { height: 10px; border-radius: 5px; background: rgba(0,0,0,.1); overflow: hidden; margin-top: 6px; }
+  .status .bar div { height: 100%; border-radius: 5px; background: var(--wait); transition: width .4s; }
+  .status.ok { background: var(--ok-bg); color: var(--ok-ink); }
+  .status.wait { background: var(--wait-bg); color: var(--wait-ink); }
+  .status.lost { background: var(--lost-bg); color: var(--lost-ink); }
+  .status.gray { background: var(--gray-bg); color: var(--gray-ink); }
+  .status.alert { background: var(--card); color: var(--alert-ink); box-shadow: 0 0 0 3px var(--alert), var(--shadow); }
+  .status.alert b { font-size: 22px; white-space: nowrap; }
+  .status .sec { font-size: 44px; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1; }
+  .status .sec small { font-size: 16px; }
+
+  .ack { width: 100%; min-height: 72px; border: 0; border-radius: 22px; background: var(--alert); color: #fff; font-size: 22px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 8px 22px rgba(229,84,75,.35); }
+  .ack svg { width: 28px; height: 28px; }
+  .acknote { text-align: center; font-size: 13px; font-weight: 700; color: var(--alert-ink); margin-top: -4px; }
+  .row { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
+  .btn { min-height: 60px; border: 0; border-radius: 20px; background: var(--card); box-shadow: var(--shadow); font-size: 16px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; }
+  .btn svg { width: 22px; height: 22px; }
+  .btn.primary { background: var(--accent); color: var(--on-accent); }
+  .info { font-size: 12.5px; color: var(--sub); font-weight: 700; line-height: 1.7; padding: 0 4px; }
+  #toast { position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 50; display: none;
+    padding: 11px 18px; border-radius: 16px; background: var(--ink); color: var(--bg); font-size: 15px; font-weight: 700; white-space: nowrap; }
+  @media (min-width: 900px) { .wrap { max-width: 980px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="/dash" id="back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>もどる</a>
+    <h1>見守りカメラ</h1>
+    <span id="clock">--:--</span>
+  </header>
+
+  <div class="stage off" id="stage">
+    <img id="video" alt="ライブ映像">
+    <div class="badge live"><i></i>ライブ</div>
+    <div class="badge head" id="head"></div>
+    <button class="full" id="full" aria-label="全画面"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    <div class="nocam" id="nocam">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="3"/><path d="m16 10 5-3v10l-5-3"/><path d="M3 3l18 18"/></svg>
+      <b id="nocamT">映像を読み込み中…</b><span id="nocamS"></span>
+    </div>
+  </div>
+
+  <div id="status"></div>
+  <div id="ackArea"></div>
+  <div class="row">
+    <button class="btn" id="arm"></button>
+    <a class="btn" id="snap" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>写真</a>
+  </div>
+  <div class="info" id="info"></div>
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const two = (n) => String(n).padStart(2, '0');
+let S = null, camBase, lanTried = '', key = '';
+const HEAD = { left: '頭：左', right: '頭：右', far: '頭：奥', near: '頭：手前' };
+const IC = {
+  ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>',
+  warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 21h20z"/><path d="M12 10v5M12 18v.5"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+};
+function dur(sec) {
+  if (sec == null) return '';
+  const m = Math.floor(sec / 60), h = Math.floor(m / 60);
+  return h > 0 ? h + '時間' + (m % 60) + '分' : (m > 0 ? m + '分' : '1分未満');
+}
+function toast(m) { const t = $('toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = 'none', 2500); }
+
+/* ---------- 映像：家のWi-Fiにいるときだけ ---------- */
+async function findCamera() {
+  const c = S.camera || {};
+  if (c.here) return '';
+  if (!c.lan_url) return null;
+  const k = c.lan_url + '|' + Math.floor(Date.now() / 30000);
+  if (lanTried === k) return camBase;
+  lanTried = k;
+  try {
+    const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 1500);
+    const r = await fetch(c.lan_url + '/api/lan', { cache: 'no-store', signal: ctl.signal });
+    clearTimeout(tm);
+    return r.ok ? c.lan_url : null;
+  } catch (e) { return null; }
+}
+async function updateCamera() {
+  const base = await findCamera();
+  if (base === camBase) return;
+  camBase = base;
+  const st = $('stage');
+  if (base === null) {
+    $('video').removeAttribute('src');
+    st.classList.add('off');
+    $('nocamT').textContent = 'カメラは家のWi-Fiで見られます';
+    $('nocamS').innerHTML = '外出先からは、映像は見られません。<br>見守りの状態と通知はそのまま使えます。';
+    $('snap').style.display = 'none'; document.querySelector('.row').classList.add('one');
+  } else {
+    $('nocamT').textContent = '映像を読み込み中…'; $('nocamS').textContent = '';
+    $('video').src = base + '/stream.mjpg?t=' + Date.now();
+    $('snap').href = base + '/snapshot.jpg'; $('snap').style.display = ''; document.querySelector('.row').classList.remove('one');
+  }
+}
+$('video').onload = () => {
+  $('stage').classList.remove('off');
+  const v = $('video'); $('stage').classList.toggle('portrait', v.naturalHeight > v.naturalWidth);
+};
+$('video').onerror = () => { if (camBase !== null) setTimeout(() => { $('video').src = camBase + '/stream.mjpg?t=' + Date.now(); }, 3000); };
+
+/* ---------- 状態 ---------- */
+function render() {
+  const st = S.status || {}, n = S.notify || {};
+  document.body.classList.toggle('alert', st.phase === 'ALERT');
+  document.documentElement.classList.toggle('alert', st.phase === 'ALERT');
+  $('head').textContent = HEAD[(S.settings || {}).head] || '';
+  let cls, ic, title, sub = '', extra = '';
+  if (st.phase === 'ALERT') {
+    cls = 'alert'; ic = IC.warn; title = '顔が見えません';
+    extra = '<div class="sec">' + Math.floor(st.absent_sec || 0) + '<small>秒</small></div>';
+    sub = (n.discord || n.mail) ? 'スマホに通知しました' : '通知先が未設定です';
+  } else if (st.phase === 'WATCHING' && st.face_visible) {
+    cls = 'ok'; ic = IC.ok; title = '見守り中'; sub = '顔が見えています・見守り ' + dur(st.armed_sec);
+  } else if (st.phase === 'WATCHING') {
+    cls = 'lost'; ic = IC.search; title = '顔を探しています';
+    sub = 'あと ' + Math.max(0, Math.ceil(st.absent_limit - st.absent_sec)) + '秒で通知します';
+  } else if (st.phase === 'WAITING') {
+    const p = Math.min(100, Math.round(100 * st.confirm_progress / st.confirm_sec));
+    cls = 'wait'; ic = IC.search; title = '顔を確認中';
+    sub = Math.floor(st.confirm_progress) + ' / ' + st.confirm_sec + '秒（見えたら見守りを始めます）<div class="bar"><div style="width:' + p + '%"></div></div>';
+  } else if (st.phase === 'PAUSED') {
+    cls = 'gray'; ic = IC.pause; title = '一時停止中'; sub = '通知しません。寝かせたら「見守り開始」';
+  } else if (st.phase === 'NO_CAMERA') {
+    cls = 'gray'; ic = IC.warn; title = 'カメラが見つかりません'; sub = 'ラズパイのケーブルを確認してください';
+  } else { cls = 'gray'; ic = IC.search; title = '起動中…'; }
+  const k = cls + title + sub + extra;
+  if (k !== key) {
+    key = k;
+    $('status').innerHTML = '<div class="status ' + cls + '"><div class="ic">' + ic + '</div><div class="tx"><b>' + title + '</b><span>' + sub + '</span></div>' + extra + '</div>';
+  }
+  $('ackArea').innerHTML = st.phase === 'ALERT'
+    ? (st.acked ? '<div class="acknote">再通知を止めています。顔が見えると、自動で見守りに戻ります</div>'
+                : '<button class="ack" id="ack">' + IC.eye + '様子を見ました</button><div class="acknote" style="margin-top:6px">押すと再通知を止めて、顔が見えるまで待ちます</div>')
+    : '';
+  const paused = st.phase === 'PAUSED' || st.phase === 'NO_CAMERA';
+  $('arm').className = 'btn' + (paused ? ' primary' : '');
+  $('arm').innerHTML = paused ? IC.play + '見守り開始' : IC.pause + '一時停止';
+  $('arm').dataset.act = paused ? 'arm' : 'disarm';
+  $('info').innerHTML = '映像は家のWi-Fiにつないだときだけ見られます。アラートの写真は、外出先でも Discord に届きます。';
+}
+async function poll() {
+  try {
+    const r = await fetch('/api/state', { cache: 'no-store' });
+    S = await r.json(); render(); await updateCamera();
+  } catch (e) {
+    $('status').innerHTML = '<div class="status gray"><div class="ic">' + IC.warn + '</div><div class="tx"><b>つながりません</b><span>家のWi-Fiか Tailscale がオンか確認してください</span></div></div>';
+    key = '';
+  }
+}
+document.addEventListener('click', async (e) => {
+  if (e.target.closest('#ack')) { await fetch('/api/ack', { method: 'POST' }); toast('再通知を止めました'); setTimeout(poll, 300); return; }
+  const a = e.target.closest('#arm');
+  if (a) { await fetch('/' + a.dataset.act, { method: 'POST' }); toast(a.dataset.act === 'arm' ? '見守りを始めました' : '一時停止しました'); setTimeout(poll, 300); }
+});
+$('full').onclick = () => {
+  const on = document.body.classList.toggle('fs');
+  const el = document.documentElement;
+  if (on && el.requestFullscreen) el.requestFullscreen().catch(() => {});
+  if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+};
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) document.body.classList.remove('fs'); });
+// 戻る：来た画面（ダッシュボード）があればそこへ
+$('back').onclick = (e) => { if (history.length > 1 && document.referrer) { e.preventDefault(); history.back(); } };
+function tick() { const d = new Date(); $('clock').textContent = d.getHours() + ':' + two(d.getMinutes()); }
+tick(); setInterval(tick, 10000);
+poll(); setInterval(poll, 1000);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { $('video').removeAttribute('src'); camBase = undefined; }   // 見ていないときは映像を止める（電池・通信の節約）
+  else { lanTried = ''; poll(); }
+});
+</script>
+</body>
+</html>
