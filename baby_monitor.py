@@ -794,7 +794,7 @@ class Handler(server.BaseHTTPRequestHandler):
 
 
 STATIC = {"/manifest.json": "application/manifest+json", "/icon-180.png": "image/png",
-          "/icon-512.png": "image/png"}
+          "/icon-512.png": "image/png", "/icon-32.png": "image/png"}
 
 
 class StreamingServer(ThreadingMixIn, server.HTTPServer):

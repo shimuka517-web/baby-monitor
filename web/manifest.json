@@ -4,10 +4,19 @@
   "start_url": "/dash",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#F4F2EC",
-  "theme_color": "#F4F2EC",
+  "background_color": "#FFF7EF",
+  "theme_color": "#FFF7EF",
   "icons": [
-    {"src": "/icon-180.png", "sizes": "180x180", "type": "image/png"},
-    {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+    {
+      "src": "/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
