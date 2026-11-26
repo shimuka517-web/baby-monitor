@@ -14,6 +14,9 @@
  *  {"token":"…","action":"upsert","id":"…","start":"2026-11-18T19:16:05+09:00","end":"…（授乳中は空）",
  *   "milk":80,"breast":30,"total":110,"source":"ベッド横の画面"}
  *  {"token":"…","action":"delete","id":"…"}
+ *  ほかの記録（おむつ・体重・室温など）は、表の名前と見出しを付けて送る。表がなければ自動で作る
+ *  {"token":"…","action":"row","table":"おむつ","header":["日時","種類","記録した場所","ID"],"id":"…","row":[…]}
+ *  {"token":"…","action":"row_delete","table":"おむつ","header":[…],"id":"…"}
  *  （v2.5 までの {"action":"add","time":…,"amount":…} も受け付けます）
  */
 
@@ -31,6 +34,7 @@ function doPost(e) {
     const lock = LockService.getScriptLock();
     lock.waitLock(20000);
     try {
+      if (d.action === 'row' || d.action === 'row_delete') return reply(genericRow(d));
       const sh = getSheet();
       migrateOld(sh);                    // 古い形式のままなら、先に新しい形式に直す
       if (d.action === 'add') {          // 旧形式：ミルクだけ・終わった記録
@@ -57,6 +61,35 @@ function doPost(e) {
   } catch (err) {
     return reply({ ok: false, error: String(err) });
   }
+}
+
+/** おむつ・体重・室温などの表：見出しの最後の列を ID として、同じ ID の行を上書き（なければ追加）・削除 */
+function genericRow(d) {
+  const name = String(d.table || '');
+  if (!name || name === SHEET_NAME || name === SUMMARY_NAME) return { ok: false, error: '使えない表の名前: ' + name };
+  const header = d.header || [];
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(name);
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    sh.appendRow(header);
+    sh.setFrozenRows(1);
+  }
+  const idCol = Math.max(1, sh.getLastColumn());
+  let r = -1;
+  if (sh.getLastRow() >= 2) {
+    const ids = sh.getRange(2, idCol, sh.getLastRow() - 1, 1).getValues();
+    for (let i = ids.length - 1; i >= 0; i--) if (String(ids[i][0]) === String(d.id)) { r = i + 2; break; }
+  }
+  if (d.action === 'row_delete') {
+    if (r > 0) sh.deleteRow(r);
+    return { ok: true };
+  }
+  const row = (d.row || []).map((v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) ? new Date(v) : v);
+  if (r < 0) { sh.appendRow(row); r = sh.getLastRow(); }
+  else sh.getRange(r, 1, 1, row.length).setValues([row]);
+  row.forEach((v, i) => { if (v instanceof Date) sh.getRange(r, i + 1).setNumberFormat('yyyy/MM/dd HH:mm'); });
+  return { ok: true };
 }
 
 /** 最初に一度だけ実行：シート・見出し・日別まとめを用意する（古い形式なら新しい形式に直す） */

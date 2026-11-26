@@ -56,6 +56,32 @@ rotate = 0
 port = 8000
 jpeg_quality = 80
 
+[baby]
+# 育児ダッシュボード（/dash）に出す名前と誕生日（生後○日の表示）。例 birth_date = "2026-11-14"
+name = ""
+birth_date = ""
+
+[env]
+# 部屋の温度・湿度（SwitchBot ハブ3など）。トークンとシークレットは secrets.toml の [switchbot] に書く
+enabled = true
+# 取得する間隔（秒）
+poll_sec = 300
+# 取得する機器のID（空なら、ハブ3など温湿度を返す機器を自動で探す）
+device_id = ""
+# 目安の範囲。外れたら通知（範囲に戻ったときも1回知らせる）。ご家庭や季節に合わせて変えてください
+alert = true
+temp_min = 20.0
+temp_max = 26.0
+hum_min = 40.0
+hum_max = 60.0
+
+[weather]
+# 天気（Open-Meteo、無料・登録不要）。場所の緯度・経度
+enabled = true
+latitude = 36.314
+longitude = 139.800
+place = "小山市"
+
 [display]
 # ベッド横の画面（docs/usage.md「夜の画面」）。保存すると自動で反映されます。
 # 夜の画面にする時間帯

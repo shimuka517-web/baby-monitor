@@ -61,6 +61,10 @@ DEFAULTS = {
     "web": {"port": 8000, "jpeg_quality": 80},
     "milk": {"default_ml": 100, "step_ml": 10, "breast_step_ml": 5, "max_ml": 300,
              "presets": [40, 60, 80, 100, 120, 160], "undo_sec": 10},
+    "baby": {"birth_date": "", "name": ""},
+    "env": {"enabled": True, "poll_sec": 300, "device_id": "", "alert": True,
+            "temp_min": 20.0, "temp_max": 26.0, "hum_min": 40.0, "hum_max": 60.0},
+    "weather": {"enabled": True, "latitude": 36.314, "longitude": 139.800, "place": "小山市"},
     "display": {"night_start": "21:00", "night_end": "07:00", "night_mode": "dim",
                 "brightness_day": 100, "brightness_night": 10, "wake_sec": 30},
 }
@@ -82,6 +86,7 @@ SECRET_DEFAULTS = {
     "gmail": {"user": "", "app_password": "", "to": []},
     "web": {"user": "", "password": ""},
     "sheets": {"gas_url": "", "token": ""},
+    "switchbot": {"token": "", "secret": ""},
 }
 DATA_DIR = os.environ.get("BABY_MONITOR_DATA_DIR", os.path.join(BASE_DIR, "data"))
 WEB_DIR = os.path.join(BASE_DIR, "web")
@@ -457,6 +462,9 @@ class Backlight:
 
 
 BACKLIGHT = None   # Backlight（main() で用意）
+LOGBOOK = None     # logbook.Logbook（おむつ・体重・温湿度）
+ENV = None         # home_env.EnvMonitor（SwitchBot）
+WEATHER = None     # home_env.Weather
 MILK = None   # milk.MilkLog（main() で用意）
 
 
@@ -470,6 +478,30 @@ def init_milk():
     MILK.start_sync_thread()
     log.info("ミルク記録: %s", "スプレッドシートへ送信します" if sender else "ラズパイ内にだけ保存します（送信先未設定）")
     return MILK
+
+
+def init_home():
+    """おむつ・体重の記録、部屋の温湿度（SwitchBot）、天気を用意する"""
+    global LOGBOOK, ENV, WEATHER
+    from logbook import Logbook
+    from milk import make_gas_sender
+    import home_env
+    sh = cfg.secrets["sheets"]
+    LOGBOOK = Logbook(os.path.join(DATA_DIR, "logbook.db"),
+                      sender=make_gas_sender(sh["gas_url"], sh["token"]) if sh["gas_url"] else None)
+    LOGBOOK.start_sync_thread()
+    sb, e = cfg.secrets["switchbot"], cfg.s["env"]
+    if e["enabled"] and sb["token"] and sb["secret"]:
+        ENV = home_env.EnvMonitor(home_env.SwitchBot(sb["token"], sb["secret"], e["device_id"]), LOGBOOK,
+                                  lambda: cfg.s["env"], notify, poll_sec=max(60, e["poll_sec"]))
+        ENV.start()
+        log.info("部屋の温湿度: SwitchBot から %d 秒ごとに取得します", e["poll_sec"])
+    else:
+        log.info("部屋の温湿度: SwitchBot が未設定です（secrets.toml の [switchbot]）")
+    w = cfg.s["weather"]
+    if w["enabled"]:
+        WEATHER = home_env.Weather(w["latitude"], w["longitude"], w["place"])
+        WEATHER.start()
 
 
 # ================================================================ Web配信
@@ -505,6 +537,12 @@ class Handler(server.BaseHTTPRequestHandler):
             self._file("index.html")
         elif path == "/milk":
             self._file("milk.html")
+        elif path in ("/dash", "/app"):
+            self._file("dash.html")
+        elif path in STATIC:
+            self._file(path.lstrip("/"), STATIC[path])
+        elif path == "/api/dash":
+            self._json(200, self._dash())
         elif path == "/status":
             with shared.lock:
                 body = json.dumps(shared.status).encode()
@@ -569,6 +607,21 @@ class Handler(server.BaseHTTPRequestHandler):
         elif self.path == "/api/test-notify":
             notify("🔔 見守りカメラのテスト通知です（画面の「設定」から送りました）。")
             self._json(200, {"ok": True})
+        elif self.path in ("/api/diaper", "/api/diaper/undo", "/api/weight", "/api/weight/delete"):
+            try:
+                body = self._body()
+                src = str(body.get("source") or "スマホ・PC")[:40]
+                if self.path == "/api/diaper":
+                    rec = LOGBOOK.add_diaper(str(body.get("kind", "")), source=src, minutes_ago=body.get("minutes_ago", 0))
+                elif self.path == "/api/diaper/undo":
+                    rec = LOGBOOK.undo_diaper(str(body.get("id", "")))
+                elif self.path == "/api/weight":
+                    rec = LOGBOOK.set_weight(body.get("grams", 0), body.get("day") or None, body.get("note", ""))
+                else:
+                    rec = LOGBOOK.delete_weight(str(body.get("day", "")))
+                self._json(200, {"ok": True, "record": rec, **self._dash()})
+            except (ValueError, KeyError, TypeError) as e:
+                self._json(400, {"ok": False, "error": str(e).strip("'\"")})
         elif self.path.startswith("/api/milk") or self.path.startswith("/api/feed"):
             try:
                 body = self._body()
@@ -600,9 +653,38 @@ class Handler(server.BaseHTTPRequestHandler):
             raise ValueError("JSON object expected")
         return d
 
-    def _file(self, name):
+    def _file(self, name, ctype="text/html; charset=utf-8"):
         with open(os.path.join(WEB_DIR, name), "rb") as f:
-            self._send(200, "text/html; charset=utf-8", f.read())
+            self._send(200, ctype, f.read())
+
+    def _dash(self):
+        """スマホ用ダッシュボード：記録・温湿度・天気・見守りの状態をまとめて返す"""
+        from datetime import date as _date
+        with shared.lock:
+            st = dict(shared.status)
+        b = cfg.s["baby"]
+        days = None
+        try:
+            if b["birth_date"]:
+                days = (_date.today() - _date.fromisoformat(b["birth_date"])).days
+        except ValueError:
+            pass
+        env = LOGBOOK.env_summary() if LOGBOOK else {"latest": None, "series": [], "trend": None}
+        e = cfg.s["env"]
+        env["range"] = {k: e[k] for k in ("temp_min", "temp_max", "hum_min", "hum_max")}
+        env["configured"] = ENV is not None
+        env["error"] = ENV.last_error if ENV else ""
+        return {
+            "baby": {"name": b["name"], "birth_date": b["birth_date"], "days": days},
+            "milk": MILK.summary() if MILK else None,
+            "diaper": LOGBOOK.diaper_summary() if LOGBOOK else None,
+            "weights": LOGBOOK.weights() if LOGBOOK else [],
+            "env": env,
+            "weather": WEATHER.summary() if WEATHER else None,
+            "monitor": {"phase": st.get("phase"), "face_visible": st.get("face_visible"), "armed_sec": st.get("armed_sec")},
+            "pending": (LOGBOOK.pending() if LOGBOOK and LOGBOOK.sender else 0),
+            "local": self.client_address[0] in ("127.0.0.1", "::1"),
+        }
 
     def _state(self):
         """タッチ画面用：見守りの状態・通知先・画面の設定・ミルクの前回をまとめて返す"""
@@ -631,6 +713,10 @@ class Handler(server.BaseHTTPRequestHandler):
         st = MILK.summary()
         st["config"] = cfg.s["milk"]
         return st
+
+
+STATIC = {"/manifest.json": "application/manifest+json", "/icon-180.png": "image/png",
+          "/icon-512.png": "image/png"}
 
 
 class StreamingServer(ThreadingMixIn, server.HTTPServer):
@@ -739,6 +825,7 @@ def main():
     log.info("液晶の明るさ調整: %s", "使えます" if BACKLIGHT.writable else
              ("権限がありません（scripts/install-service.sh を再実行）" if BACKLIGHT.available else "対応する液晶なし"))
     init_milk()
+    init_home()
     httpd = StreamingServer(("", web_cfg["port"]), Handler)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     log.info("配信開始: http://<ラズパイのIP>:%d/", web_cfg["port"])

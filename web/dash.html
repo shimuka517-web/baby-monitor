@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>育児ダッシュボード</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="育児">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#F4F2EC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#11151B" media="(prefers-color-scheme: dark)">
+<style>
+  :root {
+    --bg: #F4F2EC; --card: #FFFFFF; --ink: #1D2430; --sub: #5A6372; --line: #E3DED3; --soft: #F4F2EC;
+    --blue: #1F5FB8; --blue-bg: #E4EEFA; --orange: #C26A00; --orange-bg: #FFF1DE;
+    --green: #1C7A4E; --green-bg: #E7F4EC; --red: #B3261E; --red-bg: #FDE7E4; --yellow: #8A6200; --yellow-bg: #FFF3D1;
+    --on-accent: #FFFFFF; --temp: #D9622B; --hum: #2F7FC7; --weight: #7A55C7; --band: rgba(28,122,78,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11151B; --card: #1B212A; --ink: #E8ECF2; --sub: #9AA4B2; --line: #2B333E; --soft: #232A34;
+      --blue: #6EA8F2; --blue-bg: #1C2B40; --orange: #F0A34A; --orange-bg: #3A2A16;
+      --green: #4CC38A; --green-bg: #173326; --red: #FF8A80; --red-bg: #3D1E1C; --yellow: #F5C04A; --yellow-bg: #3A3016;
+      --on-accent: #0E1622; --temp: #FF9A62; --hum: #6EB6FF; --weight: #B49CFF; --band: rgba(76,195,138,0.12);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent; }
+  body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  button, input, a { font-family: inherit; touch-action: manipulation; }
+  button { cursor: pointer; }
+  button:active { transform: scale(0.97); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 14px 16px 32px; }
+  header { display: flex; align-items: center; gap: 12px; padding: 4px 2px 14px; }
+  .hname { display: flex; flex-direction: column; min-width: 0; }
+  .hname b { font-size: 22px; font-weight: 900; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hname span { font-size: 14px; color: var(--sub); }
+  .hright { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  #clock { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; font-size: 14px; font-weight: 700;
+    text-decoration: none; background: var(--soft); color: var(--ink); white-space: nowrap; }
+  .chip i { width: 9px; height: 9px; border-radius: 5px; background: var(--sub); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 14px; }
+  .card { background: var(--card); border-radius: 22px; padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .ctitle { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 900; }
+  .ctitle .r { margin-left: auto; font-size: 13px; font-weight: 500; color: var(--sub); }
+  .label { font-size: 14px; font-weight: 700; color: var(--sub); }
+  .big { font-size: 22px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .big b { font-size: 52px; font-weight: 900; letter-spacing: -0.5px; }
+  .sub { font-size: 15px; color: var(--sub); line-height: 1.5; }
+  .sub b { color: var(--ink); }
+  .stats { display: flex; gap: 8px; flex-wrap: wrap; }
+  .stat { flex: 1 1 0; min-width: 84px; background: var(--soft); border-radius: 14px; padding: 8px 10px; }
+  .stat span { display: block; font-size: 12px; color: var(--sub); font-weight: 700; }
+  .stat b { font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .stat small { font-size: 13px; font-weight: 700; }
+  .btns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
+  .bt { min-height: 60px; border-radius: 16px; border: 0; font-size: 17px; font-weight: 900; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .bt.pee { background: #FFF4C2; color: #6B5300; } .bt.poo { background: #F1E1CF; color: #6A3C12; } .bt.both { background: var(--soft); color: var(--ink); }
+  @media (prefers-color-scheme: dark) { .bt.pee { background: #3A3416; color: #F5DE7A; } .bt.poo { background: #3A2A1B; color: #E9B98A; } }
+  .primary { min-height: 56px; border-radius: 16px; border: 0; background: var(--blue); color: var(--on-accent); font-size: 17px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; margin-top: 4px; }
+  .milk.feeding { box-shadow: inset 0 0 0 3px var(--orange); }
+  .feedtag { display: inline-flex; align-items: center; gap: 6px; color: var(--orange); font-weight: 900; font-size: 15px; }
+  .feedtag i { width: 9px; height: 9px; border-radius: 5px; background: var(--orange); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  .warn { padding: 8px 12px; border-radius: 12px; font-size: 14px; font-weight: 700; background: var(--red-bg); color: var(--red); }
+  .okbar { padding: 8px 12px; border-radius: 12px; font-size: 14px; font-weight: 700; background: var(--green-bg); color: var(--green); }
+  .note { padding: 8px 12px; border-radius: 12px; font-size: 14px; background: var(--yellow-bg); color: var(--yellow); line-height: 1.5; }
+  .envnow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .envnow > div { background: var(--soft); border-radius: 16px; padding: 10px 12px; }
+  .envnow .v { font-size: 36px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .envnow .v small { font-size: 18px; font-weight: 700; }
+  .envnow .t { font-size: 13px; font-weight: 700; color: var(--sub); }
+  .envnow .out { box-shadow: inset 0 0 0 2px var(--red); }
+  .chart { width: 100%; height: auto; display: block; }
+  .chart text { font-size: 11px; fill: var(--sub); font-family: inherit; }
+  .days { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .day { background: var(--soft); border-radius: 16px; padding: 10px 6px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .day .d { font-size: 13px; font-weight: 700; color: var(--sub); }
+  .day .w { font-size: 13px; font-weight: 700; min-height: 2.6em; display: flex; align-items: center; }
+  .day .tmp { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .day .tmp .hi { color: var(--temp); } .day .tmp .lo { color: var(--hum); }
+  .day .pop { font-size: 12px; color: var(--sub); }
+  .wnow { display: flex; align-items: center; gap: 12px; }
+  .wnow b { font-size: 40px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  form.wf { display: grid; grid-template-columns: 1.3fr 1.3fr auto; gap: 8px; align-items: end; }
+  form.wf label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: var(--sub); }
+  form.wf input { height: 48px; border-radius: 12px; border: 2px solid var(--line); background: var(--soft); color: var(--ink); font-size: 18px; padding: 0 10px; width: 100%; min-width: 0; }
+  form.wf button { height: 48px; border-radius: 12px; border: 0; background: var(--weight); color: var(--on-accent); font-size: 16px; font-weight: 900; padding: 0 16px; }
+  .wlist { display: flex; flex-direction: column; gap: 2px; font-size: 14px; max-height: 160px; overflow: auto; }
+  .wlist div { display: flex; justify-content: space-between; align-items: center; padding: 4px 2px; border-bottom: 1px solid var(--line); }
+  .wlist button { border: 0; background: none; color: var(--sub); font-size: 13px; text-decoration: underline; }
+  .recent { font-size: 14px; color: var(--sub); line-height: 1.6; }
+  #toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 50;
+    display: none; align-items: center; gap: 14px; padding: 12px 14px 12px 18px; border-radius: 16px; background: var(--ink); color: var(--bg);
+    font-size: 16px; font-weight: 700; box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: calc(100% - 32px); }
+  #toast button { border: 0; border-radius: 10px; padding: 8px 12px; background: var(--bg); color: var(--ink); font-weight: 900; font-size: 15px; }
+  #offline { display: none; margin-bottom: 12px; }
+  @media (max-width: 420px) {
+    .wrap { padding: 10px 12px 28px; } .hname b { font-size: 18px; } #clock { font-size: 18px; }
+    .bt { font-size: 15px; gap: 4px; min-height: 56px; } .bt svg { width: 15px; height: 15px; }
+    .big b { font-size: 46px; }
+  }
+  .foot { margin-top: 18px; text-align: center; font-size: 12px; color: var(--sub); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="11" r=".8" fill="currentColor"/><circle cx="15" cy="11" r=".8" fill="currentColor"/><path d="M9.5 15c1.4 1.2 3.6 1.2 5 0"/><path d="M12 3c1.5 1.5 1.5 3 0 4"/></svg>
+    <div class="hname"><b id="bname">育児の記録</b><span id="bdays"></span></div>
+    <div class="hright">
+      <a class="chip" id="mon" href="/"><i></i><span>見守り</span></a>
+      <span id="clock">--:--</span>
+    </div>
+  </header>
+  <div class="warn" id="offline">ラズパイにつながりません。家のWi-Fiか、Tailscale がオンになっているか確認してください。</div>
+
+  <div class="grid">
+    <section class="card milk" id="milkCard"></section>
+    <section class="card" id="diaperCard"></section>
+    <section class="card" id="envCard"></section>
+    <section class="card" id="weatherCard"></section>
+    <section class="card" id="weightCard">
+      <div class="ctitle">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16l-2 13H6z"/><path d="M9 7a3 3 0 0 1 6 0"/><path d="m12 13 2-2"/></svg>
+        体重<span class="r" id="wcount"></span></div>
+      <div id="wsummary"></div>
+      <div id="wchart"></div>
+      <form class="wf" id="wform">
+        <label>体重（g）<input id="wgrams" type="number" inputmode="numeric" min="1000" max="30000" step="1" placeholder="例 3450" required></label>
+        <label>日付<input id="wday" type="date" required></label>
+        <button type="submit">記録</button>
+      </form>
+      <div class="wlist" id="wlist"></div>
+    </section>
+  </div>
+  <div class="foot" id="foot"></div>
+</div>
+<div id="toast" role="status"><span id="tmsg"></span><button id="tundo">取り消す</button></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let D = null, undoId = null, toastTimer = null;
+const SOURCE = ['localhost', '127.0.0.1'].includes(location.hostname) ? 'ベッド横の画面' : 'スマホ・PC';
+const two = (n) => String(n).padStart(2, '0');
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function hmDur(min) {
+  if (min == null) return '';
+  const h = Math.floor(min / 60), m = min % 60;
+  return h > 0 ? '<b>' + h + '</b>時間<b>' + m + '</b>分' : '<b>' + m + '</b>分';
+}
+const IC = {
+  milk: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 2h6"/><path d="M10 2v3l-2 3v12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V8l-2-3V2"/><path d="M8 12h8"/></svg>',
+  diaper: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18v3a9 9 0 0 1-18 0z"/><path d="M8 10.5c0 2.5 1.8 4.5 4 4.5s4-2 4-4.5"/></svg>',
+  home: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 4l9 6.5"/><path d="M5 9.5V20h14V9.5"/><path d="M12 16v-4"/><circle cx="12" cy="16.5" r="1.5"/></svg>',
+  drop: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></svg>',
+  poo: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 20h10a3 3 0 0 0 .6-5.9A3 3 0 0 0 15 9.5a3 3 0 0 0-1-4.5c.2 1.5-1 2.5-2.5 2.5A2.5 2.5 0 0 0 9 10a3 3 0 0 0-2.6 4.1A3 3 0 0 0 7 20z"/></svg>',
+};
+const WIC = {
+  sun: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#E89A1C" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="#F5C04A"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  partly: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="3.5" fill="#F5C04A" stroke="#E89A1C"/><path d="M8 19h9a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6 1.2A3 3 0 0 0 8 19z" fill="#C9D3DF" stroke="#8A97A8"/></svg>',
+  cloud: '<svg width="40" height="40" viewBox="0 0 24 24" fill="#C9D3DF" stroke="#8A97A8" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M7 19h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.5A3.3 3.3 0 0 0 7 19z"/></svg>',
+  rain: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 15h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.5A3.3 3.3 0 0 0 7 15z" fill="#C9D3DF" stroke="#8A97A8"/><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3" stroke="#2F7FC7"/></svg>',
+  snow: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 15h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.5A3.3 3.3 0 0 0 7 15z" fill="#DDE5EE" stroke="#8A97A8"/><path d="M8 19h.01M12 20h.01M16 19h.01" stroke="#6EB6FF" stroke-width="3"/></svg>',
+  thunder: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 15h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.5A3.3 3.3 0 0 0 7 15z" fill="#B8C2CE" stroke="#7A8798"/><path d="m12 14-2 4h3l-2 4" stroke="#E89A1C" stroke-width="2"/></svg>',
+  fog: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#8A97A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 9h16M3 13h18M5 17h14"/></svg>',
+};
+
+/* ---------- 折れ線グラフ（SVG） ---------- */
+function lineChart(pts, o) {
+  // pts: [{x: ミリ秒, y}]、o: {color, unit, band:[lo,hi], xmin, xmax, h, fmtX, dec, area}
+  const W = 340, H = o.h || 120, L = 34, R = 8, T = 10, B = 20;
+  if (!pts.length) return '<div class="sub">まだデータがありません</div>';
+  const ys = pts.map((p) => p.y).concat(o.band || []);
+  let y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const pad = Math.max((y1 - y0) * 0.15, o.minSpan || 1);
+  y0 -= pad; y1 += pad;
+  const x0 = o.xmin ?? pts[0].x, x1 = o.xmax ?? pts[pts.length - 1].x;
+  const sx = (x) => L + (W - L - R) * (x1 === x0 ? 0.5 : (x - x0) / (x1 - x0));
+  const sy = (y) => T + (H - T - B) * (1 - (y - y0) / (y1 - y0));
+  let s = '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(o.label || '') + '">';
+  if (o.band) s += '<rect x="' + L + '" width="' + (W - L - R) + '" y="' + sy(o.band[1]) + '" height="' + (sy(o.band[0]) - sy(o.band[1])) + '" fill="var(--band)"/>';
+  for (let i = 0; i <= 2; i++) {
+    const v = y0 + (y1 - y0) * i / 2, y = sy(v);
+    s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y + '" y2="' + y + '" stroke="var(--line)"/>';
+    s += '<text x="' + (L - 4) + '" y="' + (y + 4) + '" text-anchor="end">' + v.toFixed(o.dec ?? 0) + '</text>';
+  }
+  (o.ticks || []).forEach(([x, t], i, a) => { const an = i === 0 ? 'start' : i === a.length - 1 ? 'end' : 'middle';
+    s += '<text x="' + sx(x) + '" y="' + (H - 4) + '" text-anchor="' + an + '">' + t + '</text>'; });
+  const path = pts.map((p, i) => (i ? 'L' : 'M') + sx(p.x).toFixed(1) + ' ' + sy(p.y).toFixed(1)).join(' ');
+  s += '<path d="' + path + '" fill="none" stroke="' + o.color + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+  if (o.dots) pts.forEach((p) => { s += '<circle cx="' + sx(p.x) + '" cy="' + sy(p.y) + '" r="3.5" fill="' + o.color + '"/>'; });
+  const last = pts[pts.length - 1];
+  s += '<circle cx="' + sx(last.x) + '" cy="' + sy(last.y) + '" r="4.5" fill="' + o.color + '" stroke="var(--card)" stroke-width="2"/>';
+  return s + '</svg>';
+}
+
+/* ---------- 各カード ---------- */
+function renderMilk() {
+  const m = D.milk, c = $('milkCard');
+  if (!m) { c.innerHTML = ''; return; }
+  const o = m.open, l = m.last;
+  c.classList.toggle('feeding', !!o);
+  let h = '<div class="ctitle">' + IC.milk + 'ミルク・母乳<span class="r">' + (m.sync_enabled && m.pending ? '未送信 ' + m.pending + '件' : '') + '</span></div>';
+  if (o) h += '<div class="feedtag"><i></i>授乳中（' + o.time + ' から）</div><div class="big">' + hmDur(o.elapsed_min) + '</div>';
+  else h += '<div class="label">前回の授乳から</div><div class="big">' + (l ? hmDur(l.minutes_ago) : '<b style="font-size:30px">記録なし</b>') + '</div>';
+  if (l) h += '<div class="sub">前回 <b>' + l.time + '</b> 開始・<b>' + l.amount + 'ml</b>（ミルク' + l.milk + '・母乳' + l.breast + '）</div>';
+  h += '<div class="stats"><div class="stat"><span>今日の合計</span><b>' + m.today_total + '</b><small>ml</small></div>' +
+    '<div class="stat"><span>回数</span><b>' + m.today_count + '</b><small>回</small></div>' +
+    '<div class="stat"><span>ミルク／母乳</span><b style="font-size:17px">' + m.today_milk + '／' + m.today_breast + '</b></div></div>';
+  h += '<a class="primary" href="/milk">' + (o ? '飲み終わった・量を入れる' : 'あげ始める・記録する') + '</a>';
+  c.innerHTML = h;
+}
+function renderDiaper() {
+  const d = D.diaper, c = $('diaperCard');
+  if (!d) { c.innerHTML = ''; return; }
+  const l = d.last, p = d.last_poo;
+  let h = '<div class="ctitle">' + IC.diaper + 'おむつ</div><div class="label">前回のおむつ替えから</div>' +
+    '<div class="big">' + (l ? hmDur(l.minutes_ago) : '<b style="font-size:30px">記録なし</b>') + '</div>';
+  if (l) h += '<div class="sub">前回 <b>' + l.time + '</b>・' + l.label + (p ? '<br>うんちは <b>' + p.ago_text + '</b>（' + p.time + '）' : '') + '</div>';
+  h += '<div class="stats"><div class="stat"><span>今日</span><b>' + d.today_count + '</b><small>回</small></div>' +
+    '<div class="stat"><span>おしっこ</span><b>' + d.today_pee + '</b><small>回</small></div>' +
+    '<div class="stat"><span>うんち</span><b>' + d.today_poo + '</b><small>回</small></div></div>';
+  h += '<div class="btns"><button class="bt pee" data-diaper="pee">' + IC.drop + 'おしっこ</button>' +
+    '<button class="bt poo" data-diaper="poo">' + IC.poo + 'うんち</button>' +
+    '<button class="bt both" data-diaper="both">両方</button></div>';
+  if (d.recent.length) h += '<div class="recent">今日：' + d.recent.map((r) => r.time + ' ' + r.label.replace('おしっこ＋うんち', '両方')).join('、') + '</div>';
+  c.innerHTML = h;
+}
+function renderEnv() {
+  const e = D.env, c = $('envCard'), r = e.range;
+  let h = '<div class="ctitle">' + IC.home + '部屋の温度・湿度<span class="r">' + (e.latest ? e.latest.time + ' 更新' : '') + '</span></div>';
+  if (!e.configured && !e.latest) {
+    c.innerHTML = h + '<div class="note">SwitchBot が未設定です。<code>config/secrets.toml</code> の <code>[switchbot]</code> にトークンとシークレットを入れて、再起動してください（docs/home.md）。</div>';
+    return;
+  }
+  if (!e.latest) { c.innerHTML = h + '<div class="note">温湿度を取得中です…' + (e.error ? '<br>' + esc(e.error) : '') + '</div>'; return; }
+  const t = e.latest.temp, hu = e.latest.hum, tOut = t < r.temp_min || t > r.temp_max, hOut = hu < r.hum_min || hu > r.hum_max;
+  const arrow = (v) => v == null ? '' : v > 0.2 ? ' ↗' : v < -0.2 ? ' ↘' : ' →';
+  h += '<div class="envnow"><div class="' + (tOut ? 'out' : '') + '"><div class="t">室温' + (e.trend ? arrow(e.trend.temp) : '') + '</div><div class="v" style="color:var(--temp)">' + t.toFixed(1) + '<small>℃</small></div></div>' +
+    '<div class="' + (hOut ? 'out' : '') + '"><div class="t">湿度' + (e.trend ? arrow(e.trend.hum) : '') + '</div><div class="v" style="color:var(--hum)">' + Math.round(hu) + '<small>%</small></div></div></div>';
+  const msgs = [];
+  if (t < r.temp_min) msgs.push('室温が低めです'); if (t > r.temp_max) msgs.push('室温が高めです');
+  if (hu < r.hum_min) msgs.push('乾燥しています'); if (hu > r.hum_max) msgs.push('湿度が高めです');
+  h += msgs.length ? '<div class="warn">' + msgs.join('・') + '（目安 ' + r.temp_min + '〜' + r.temp_max + '℃・' + r.hum_min + '〜' + r.hum_max + '%）</div>'
+    : '<div class="okbar">目安の範囲内です（' + r.temp_min + '〜' + r.temp_max + '℃・' + r.hum_min + '〜' + r.hum_max + '%）</div>';
+  const now = Date.now(), xmin = now - 24 * 3600e3;
+  const ticks = [];
+  for (let k = 0; k <= 4; k++) { const x = xmin + k * 6 * 3600e3; ticks.push([x, k === 4 ? '今' : new Date(x).getHours() + '時']); }
+  const pts = e.series.map((p) => ({ x: new Date(p.t).getTime(), t: p.temp, h: p.hum }));
+  h += '<div class="label">室温（24時間）</div>' + lineChart(pts.map((p) => ({ x: p.x, y: p.t })), { color: 'var(--temp)', band: [r.temp_min, r.temp_max], xmin, xmax: now, ticks, dec: 0, label: '室温の推移', minSpan: 1 });
+  h += '<div class="label">湿度（24時間）</div>' + lineChart(pts.map((p) => ({ x: p.x, y: p.h })), { color: 'var(--hum)', band: [r.hum_min, r.hum_max], xmin, xmax: now, ticks, dec: 0, label: '湿度の推移', minSpan: 3 });
+  c.innerHTML = h;
+}
+function renderWeather() {
+  const w = D.weather, c = $('weatherCard');
+  let h = '<div class="ctitle"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>天気<span class="r">' + (w ? esc(w.place) : '') + '</span></div>';
+  if (!w) { c.innerHTML = h + '<div class="note">天気を取得中です…</div>'; return; }
+  if (w.now) h += '<div class="wnow">' + (WIC[w.now.icon] || '') + '<div><div class="label">いまの外</div><b>' + w.now.temp.toFixed(1) + '</b>℃　' + esc(w.now.text) +
+    (w.now.hum != null ? '<div class="sub">湿度 ' + w.now.hum + '%</div>' : '') + '</div></div>';
+  const names = ['今日', '明日', '明後日'];
+  h += '<div class="days">' + w.days.map((d, i) => {
+    const dt = new Date(d.date + 'T00:00:00');
+    return '<div class="day"><div class="d">' + names[i] + ' ' + (dt.getMonth() + 1) + '/' + dt.getDate() + '</div>' + (WIC[d.icon] || '') +
+      '<div class="w">' + esc(d.text) + '</div><div class="tmp"><span class="hi">' + d.max + '°</span> / <span class="lo">' + d.min + '°</span></div>' +
+      '<div class="pop">降水 ' + (d.pop == null ? '-' : d.pop + '%') + '</div></div>';
+  }).join('') + '</div>';
+  c.innerHTML = h;
+}
+function renderWeight() {
+  const ws = D.weights;
+  $('wcount').textContent = ws.length ? ws.length + '件' : '';
+  if (!ws.length) { $('wsummary').innerHTML = '<div class="sub">体重計で測ったら、下に入れてください（g単位）。</div>'; $('wchart').innerHTML = ''; $('wlist').innerHTML = ''; return; }
+  const last = ws[ws.length - 1];
+  let s = '<div class="big"><b>' + (last.grams / 1000).toFixed(3).replace(/0+$/, '').replace(/\.$/, '') + '</b>kg <span class="sub">（' + last.grams + 'g・' + last.day.slice(5).replace('-', '/') + '）</span></div>';
+  if (ws.length >= 2) {
+    const prev = ws[ws.length - 2];
+    const days = Math.max(1, Math.round((new Date(last.day) - new Date(prev.day)) / 86400e3));
+    const diff = last.grams - prev.grams;
+    s += '<div class="sub">前回（' + prev.day.slice(5).replace('-', '/') + '）から <b>' + (diff >= 0 ? '+' : '') + diff + 'g</b>・1日あたり <b>' + (diff >= 0 ? '+' : '') + Math.round(diff / days) + 'g</b></div>';
+  }
+  $('wsummary').innerHTML = s;
+  const pts = ws.map((w) => ({ x: new Date(w.day + 'T12:00:00').getTime(), y: w.grams }));
+  const ticks = [];
+  if (pts.length >= 2) {
+    const a = pts[0].x, b = pts[pts.length - 1].x;
+    for (let k = 0; k <= 3; k++) { const d = new Date(a + (b - a) * k / 3); ticks.push([d.getTime(), (d.getMonth() + 1) + '/' + d.getDate()]); }
+  }
+  $('wchart').innerHTML = lineChart(pts, { color: 'var(--weight)', ticks, dots: true, dec: 0, minSpan: 50, label: '体重の推移', h: 130 });
+  $('wlist').innerHTML = ws.slice().reverse().map((w) => '<div><span>' + w.day.replace(/-/g, '/') + '　<b>' + w.grams + 'g</b>' + (w.note ? '　' + esc(w.note) : '') + '</span><button data-wdel="' + w.day + '">消す</button></div>').join('');
+}
+function renderHeader() {
+  const b = D.baby;
+  $('bname').textContent = b.name || '育児の記録';
+  if (b.days != null && b.days >= 0) {
+    const months = Math.floor(b.days / 30.44);
+    $('bdays').textContent = '生後 ' + b.days + '日' + (months >= 1 ? '（' + months + 'か月）' : '');
+  } else $('bdays').textContent = b.birth_date ? '' : '誕生日は settings.toml の [baby] で設定できます';
+  const m = D.monitor, chip = $('mon');
+  const map = { WATCHING: ['見守り中', m.face_visible ? 'var(--green)' : 'var(--orange)'], WAITING: ['確認中', 'var(--yellow)'],
+    ALERT: ['アラート', 'var(--red)'], PAUSED: ['一時停止', 'var(--sub)'], NO_CAMERA: ['カメラなし', 'var(--sub)'] };
+  const [t, col] = map[m.phase] || ['見守り', 'var(--sub)'];
+  chip.innerHTML = '<i style="background:' + col + '"></i><span>' + t + '</span>';
+}
+function renderAll() {
+  if (!D) return;
+  renderHeader(); renderMilk(); renderDiaper(); renderEnv(); renderWeather(); renderWeight();
+  $('foot').textContent = (D.pending ? '共有シートへ未送信 ' + D.pending + '件（自動で再送）・' : '') + '30秒ごとに更新';
+}
+
+/* ---------- 通信 ---------- */
+async function refresh() {
+  try {
+    const r = await fetch('/api/dash', { cache: 'no-store' });
+    D = await r.json(); $('offline').style.display = 'none'; renderAll();
+  } catch (e) { $('offline').style.display = 'block'; }
+}
+async function post(path, body) {
+  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: SOURCE, ...body }) });
+  const j = await r.json();
+  if (!r.ok || !j.ok) throw new Error(j.error || 'うまく記録できませんでした');
+  return j;
+}
+function toast(msg, id) {
+  $('tmsg').textContent = msg; undoId = id || null;
+  $('tundo').style.display = id ? '' : 'none';
+  $('toast').style.display = 'flex';
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('toast').style.display = 'none'; undoId = null; }, 10000);
+}
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-diaper]');
+  if (b) {
+    try { const j = await post('/api/diaper', { kind: b.dataset.diaper }); D = j; renderAll(); toast(j.record.ts.slice(11, 16) + ' ' + j.record.label + ' を記録しました', j.record.id); }
+    catch (err) { toast(err.message); }
+    return;
+  }
+  const w = e.target.closest('[data-wdel]');
+  if (w) {
+    if (!confirm(w.dataset.wdel.replace(/-/g, '/') + ' の体重を消しますか？')) return;
+    try { const j = await post('/api/weight/delete', { day: w.dataset.wdel }); D = j; renderAll(); toast('消しました'); } catch (err) { toast(err.message); }
+  }
+});
+$('tundo').onclick = async () => {
+  if (!undoId) return;
+  try { const j = await post('/api/diaper/undo', { id: undoId }); D = j; renderAll(); toast('取り消しました'); } catch (err) { toast(err.message); }
+};
+$('wform').onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const j = await post('/api/weight', { grams: Number($('wgrams').value), day: $('wday').value });
+    D = j; renderAll(); $('wgrams').value = ''; toast(j.record.grams + 'g を記録しました');
+  } catch (err) { toast(err.message); }
+};
+function today() { const d = new Date(); return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()); }
+$('wday').value = today(); $('wday').max = today();
+function tick() { const d = new Date(); $('clock').textContent = d.getHours() + ':' + two(d.getMinutes()); }
+tick(); setInterval(tick, 10000);
+refresh(); setInterval(refresh, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+</script>
+</body>
+</html>
