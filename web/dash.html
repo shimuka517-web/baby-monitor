@@ -25,7 +25,7 @@
     --sum: #FFB86B; --sum-bg: #FFF0DF; --sum-ink: #B86A12;
     --warn: #E5544B; --warn-bg: #FFE6E3; --ok-bg: #E2F6EE; --ok: #2C8A66;
     --temp: #FF8A5C; --hum: #5AA9E6; --band: rgba(79,191,149,.13);
-    --fab: #FF8E8E; --on-fab: #FFFFFF;
+    --fab: #E85D6C; --on-fab: #FFFFFF;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -164,6 +164,7 @@
   #toast { position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 50;
     display: none; align-items: center; gap: 12px; padding: 11px 12px 11px 18px; border-radius: 18px; background: var(--ink); color: var(--bg);
     font-size: 15px; font-weight: 700; box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: calc(100% - 28px); white-space: nowrap; }
+  .sheet.show ~ #toast { bottom: auto; top: calc(14px + env(safe-area-inset-top)); }
   #toast button { border: 0; border-radius: 12px; padding: 8px 12px; background: var(--bg); color: var(--ink); font-weight: 900; font-size: 14px; }
   #offline { display: none; }
   .party { position: relative; overflow: hidden; display: flex; align-items: center; gap: 12px; margin: 0 0 12px; padding: 14px 16px; border-radius: 22px;
@@ -174,8 +175,36 @@
   .party .pi { width: 44px; height: 44px; flex: none; position: relative; }
   .soon { display: inline-block; margin-top: 2px; padding: 2px 8px; border-radius: 999px; background: var(--milk-bg); color: var(--milk-ink); font-size: 11.5px; font-weight: 900; }
   .mi.off { opacity: .55; }
+  .feedhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .feedhead .ftag { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: var(--milk-bg); color: var(--milk-ink); font-size: 14px; font-weight: 900; }
+  .feedhead .when { font-size: 15px; font-weight: 900; }
+  .feedhead .when small { font-size: 12px; color: var(--sub); }
+  .feedhead .adj { margin-left: auto; display: flex; gap: 6px; }
+  .feedhead .adj button { border: 0; border-radius: 12px; padding: 8px 10px; font-size: 13px; font-weight: 700; background: var(--card); box-shadow: var(--shadow); }
+  .stp { display: flex; align-items: center; gap: 10px; border-radius: 20px; padding: 10px 12px; margin-bottom: 8px; }
+  .stp.milkr { background: var(--milk-bg); color: var(--milk-ink); }
+  .stp.breastr { background: var(--wt-bg); color: var(--wt-ink); }
+  .stp .nm { width: 52px; font-size: 16px; font-weight: 900; }
+  .stp .rb { width: 56px; height: 56px; border-radius: 28px; border: 0; background: var(--card); color: inherit; font-size: 30px; font-weight: 900; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); flex: none; }
+  .stp .rb.plus { background: currentColor; }
+  .stp .rb.plus span { color: var(--card); }
+  .stp .val { flex: 1; text-align: center; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .stp .val b { font-size: 44px; font-weight: 900; }
+  .ftotal { display: flex; align-items: baseline; justify-content: flex-end; gap: 6px; font-size: 16px; font-weight: 900; margin: 2px 4px 10px; }
+  .ftotal b { font-size: 40px; font-variant-numeric: tabular-nums; }
+  .ftotal small { margin-right: auto; font-size: 12px; color: var(--sub); }
+  .facts { display: grid; grid-template-columns: 1fr 2.2fr; gap: 8px; }
+  .facts button { min-height: 60px; border-radius: 18px; border: 0; font-size: 16px; font-weight: 900; }
+  .facts .q { background: var(--card); box-shadow: var(--shadow); }
+  .facts .go { background: var(--fab); color: var(--on-fab); }
+  .facts .go:disabled { opacity: .5; }
+  .bigstart { width: 100%; min-height: 150px; border: 0; border-radius: 26px; background: var(--fab); color: var(--on-fab); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; box-shadow: 0 8px 22px rgba(255,120,120,.35); }
+  .bigstart b { font-size: 30px; font-weight: 900; } .bigstart span { font-size: 13px; font-weight: 700; opacity: .9; } .bigstart svg { width: 44px; height: 44px; }
+  .later { width: 100%; margin-top: 10px; min-height: 52px; border: 0; border-radius: 18px; background: var(--card); box-shadow: var(--shadow); font-size: 15px; font-weight: 700; }
+  .lastfeed { margin-top: 12px; font-size: 13px; color: var(--sub); font-weight: 700; text-align: center; }
   .gear { width: 40px; height: 40px; border-radius: 14px; border: 0; background: var(--card); box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center; padding: 0; }
   .gear svg { width: 22px; height: 22px; }
+  #setCard .setrow { box-shadow: none; background: var(--soft, var(--bg)); }
   .setrow { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: 18px; padding: 14px; box-shadow: var(--shadow); }
   .setrow .tx { flex: 1; min-width: 0; }
   .setrow b { display: block; font-size: 16px; font-weight: 900; }
@@ -196,7 +225,6 @@
     <div class="hright">
       <a class="chip" id="mon" href="/"><i></i><span>見守り</span></a>
       <span id="clock">--:--</span>
-      <button class="gear" id="gear" aria-label="設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
     </div>
   </header>
   <div id="party"></div>
@@ -218,6 +246,7 @@
     <section class="card" id="skyCard"></section>
     <section class="card" id="logCard"></section>
   </div>
+  <section class="card" id="setCard"></section>
   <div class="foot" id="foot"></div>
 </div>
 
@@ -482,7 +511,7 @@ function renderHeader() {
 }
 function renderAll() {
   if (!D) return;
-  renderHeader(); renderTiles(); renderTimeline(); renderRoom(); renderWeight(); renderSky(); renderLog();
+  renderHeader(); renderTiles(); renderTimeline(); renderRoom(); renderWeight(); renderSky(); renderLog(); renderSettings();
   $('foot').textContent = (D.pending ? '共有シートへ未送信 ' + D.pending + '件（自動で再送）・' : '') + '30秒ごとに更新';
   if ($('sheet').classList.contains('show') && sheetView === 'menu') openMenu();
 }
@@ -494,7 +523,7 @@ function closeSheet() { $('sheet').classList.remove('show'); sheetView = ''; }
 function openMenu() {
   const o = D && D.milk && D.milk.open;
   openSheet('<div class="ph"><b id="ptitle">なにを記録する？</b><button data-act="close">とじる</button></div><div class="menu">' +
-    '<a class="mi milk" href="/milk">' + IC.milk + (o ? '授乳をおわる<small>' + o.time + ' から ' + o.elapsed_min + '分</small>' : 'ミルク・母乳<small>あげ始めに押す</small>') + '</a>' +
+    '<button class="mi milk" data-act="milk">' + IC.milk + (o ? '授乳をおわる<small>' + o.time + ' から ' + o.elapsed_min + '分</small>' : 'ミルク・母乳<small>あげ始めに押す</small>') + '</button>' +
     '<button class="mi dia" data-act="diaper">' + IC.dia + 'おむつ<small>おしっこ・うんち</small></button>' +
     '<button class="mi wt" data-act="weight">' + IC.wt + 'たいじゅう<small>g で入れる</small></button>' +
     (camLink ? '<a class="mi cam" href="' + camLink + '">' + IC.cam + '見守りカメラ<small>家のWi-Fi</small></a>'
@@ -518,14 +547,87 @@ function openWeight() {
   setTimeout(() => $('wgrams') && $('wgrams').focus(), 250);
 }
 $('fab').onclick = openMenu;
-function openSettings() {
+
+/* ---------- ミルク・母乳（スマホ用のパネル） ---------- */
+let feed = { mode: '', milk: 0, breast: 0, adj: 0, edited: false };   // mode: start / open / later
+const mcfg = () => D.milk_config || { step_ml: 10, breast_step_ml: 5, max_ml: 300, default_ml: 100 };
+function openMilk() {
+  const m = D.milk, o = m && m.open;
+  if (o) {
+    if (feed.mode !== 'open' || !feed.edited) {
+      feed = { mode: 'open', milk: m.last ? o.suggest_milk : mcfg().default_ml, breast: o.suggest_breast, adj: 0, edited: false };
+    }
+    return renderFeed();
+  }
+  feed.mode = 'start';
+  const l = m && m.last;
+  openSheet('<div class="ph"><button class="back" data-act="menu">‹ もどる</button><b id="ptitle">ミルク・母乳</b><button data-act="close">とじる</button></div>' +
+    '<button class="bigstart" data-act="feedstart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6"/></svg>' +
+    '<b>あげ始める</b><span>押した時刻が開始時刻になります</span></button>' +
+    '<button class="later" data-act="feedlater">押し忘れたとき：あとからまとめて記録</button>' +
+    (l ? '<div class="lastfeed">前回 ' + l.time + ' 開始・' + l.amount + 'ml（' + l.ago_text + '）</div>' : ''), 'milk');
+}
+function feedStart() {
+  const o = D.milk && D.milk.open;
+  if (feed.mode === 'open' && o) return new Date(new Date(o.ts).getTime() + feed.adj * 60000);
+  return new Date(Date.now() - feed.adj * 60000);
+}
+function renderFeed() {
+  const c = mcfg(), t = feedStart(), mins = Math.max(0, Math.round((Date.now() - t.getTime()) / 60000)), total = feed.milk + feed.breast;
+  const open = feed.mode === 'open';
+  openSheet('<div class="ph"><button class="back" data-act="menu">‹ もどる</button><b id="ptitle">' + (open ? '授乳中' : 'あとから記録') + '</b><button data-act="close">とじる</button></div>' +
+    '<div class="feedhead">' + (open ? '<span class="ftag"><span class="pulse"></span>授乳中</span>' : '') +
+    '<span class="when">' + (open ? '開始 ' : 'あげ始め ') + t.getHours() + ':' + two(t.getMinutes()) + ' <small>（' + (mins < 1 ? 'たった今' : mins + '分前') + '）</small></span>' +
+    '<span class="adj"><button data-act="fminus">−5分</button><button data-act="fplus">＋5分</button></span></div>' +
+    '<div class="stp milkr"><span class="nm">ミルク</span><button class="rb" data-step="milk" data-d="-1" aria-label="ミルクを減らす">−</button>' +
+    '<span class="val"><b>' + feed.milk + '</b>ml</span><button class="rb plus" data-step="milk" data-d="1" aria-label="ミルクを増やす"><span>＋</span></button></div>' +
+    '<div class="stp breastr"><span class="nm">母乳</span><button class="rb" data-step="breast" data-d="-1" aria-label="母乳を減らす">−</button>' +
+    '<span class="val"><b>' + feed.breast + '</b>ml</span><button class="rb plus" data-step="breast" data-d="1" aria-label="母乳を増やす"><span>＋</span></button></div>' +
+    '<div class="ftotal"><small>ミルク ' + c.step_ml + 'ml・母乳 ' + (c.breast_step_ml || 5) + 'ml ずつ</small>合計<b>' + total + '</b>ml</div>' +
+    '<div class="facts"><button class="q" data-act="' + (open ? 'feedcancel' : 'milk') + '">' + (open ? 'やめる' : 'もどる') + '</button>' +
+    '<button class="go" data-act="feedfinish"' + (total <= 0 ? ' disabled' : '') + '>' + (total <= 0 ? '量を入れてください' : (open ? 'あげ終わった・' : '') + total + 'ml を記録') + '</button></div>', 'feed');
+}
+function isoLocal(d) {
+  const off = -d.getTimezoneOffset(), sg = off >= 0 ? '+' : '-';
+  return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()) + 'T' + two(d.getHours()) + ':' + two(d.getMinutes()) + ':00' + sg + two(Math.floor(Math.abs(off) / 60)) + ':' + two(Math.abs(off) % 60);
+}
+async function feedAct(act) {
+  const c = mcfg();
+  if (act === 'milk') return openMilk();
+  if (act === 'feedstart') {
+    const j = await post('/api/feed/start', {}); D = { ...D, milk: j }; feed.mode = ''; openMilk(); renderAll(); toast(j.record.time + ' に開始しました');
+  } else if (act === 'feedlater') {
+    const l = D.milk && D.milk.last;
+    feed = { mode: 'later', milk: l ? l.milk : c.default_ml, breast: l ? l.breast : 0, adj: 20, edited: false }; renderFeed();
+  } else if (act === 'fminus' || act === 'fplus') {
+    const d = act === 'fminus' ? 5 : -5;              // open：開始時刻を前後／later：何分前を増減
+    if (feed.mode === 'open') {
+      const o = D.milk.open, maxFwd = Math.floor((Date.now() - new Date(o.ts).getTime()) / 60000);
+      feed.adj = Math.max(-600, Math.min(maxFwd, feed.adj - d));
+    } else feed.adj = Math.max(0, Math.min(600, feed.adj + d));
+    feed.edited = true; renderFeed();
+  } else if (act === 'feedcancel') {
+    if (!confirm('この授乳を記録しないで消しますか？')) return;
+    const j = await post('/api/feed/undo', { id: D.milk.open.id }); D = { ...D, milk: j }; feed.mode = ''; closeSheet(); await refresh(); toast('授乳を取り消しました');
+  } else if (act === 'feedfinish') {
+    let j;
+    if (feed.mode === 'open') {
+      const body = { id: D.milk.open.id, milk: feed.milk, breast: feed.breast };
+      if (feed.adj) body.start = isoLocal(feedStart());
+      j = await post('/api/feed/finish', body);
+    } else j = await post('/api/feed/add', { milk: feed.milk, breast: feed.breast, minutes_ago: feed.adj });
+    const r = j.record; feed = { mode: '', milk: r.milk, breast: r.breast, adj: 0, edited: false };
+    closeSheet(); await refresh();
+    toast(r.amount + 'ml を記録（ミルク' + r.milk + '・母乳' + r.breast + '）', r.id, 'feed');
+  }
+}
+function renderSettings() {
   const e = D.env, r = e.range, on = !!e.alert;
-  openSheet('<div class="ph"><b id="ptitle">設定</b><button data-act="close">とじる</button></div>' +
+  $('setCard').innerHTML = '<div class="ch"><span style="width:22px;height:22px;color:var(--sub)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></span>設定</div>' +
     '<div class="setrow"><div class="tx"><b>お部屋の「暑い・寒い」通知</b><span>室温 ' + r.temp_min + '〜' + r.temp_max + '℃・湿度 ' + r.hum_min + '〜' + r.hum_max + '% を外れたら Discord に知らせます</span></div>' +
     '<button class="sw' + (on ? ' on' : '') + '" data-act="envalert" role="switch" aria-checked="' + on + '" aria-label="お部屋の通知"></button></div>' +
-    '<div class="setnote">オフにしても、画面の「暑い」「寒い」の表示とグラフはそのまま出ます。<br>目安の温度・湿度は、ラズパイの <code>config/settings.toml</code> の <code>[env]</code> で変えられます。</div>', 'settings');
+    '<div class="setnote">オフにしても、画面の「暑い」「寒い」の表示とグラフはそのまま出ます。<br>目安の温度・湿度は、ラズパイの <code>config/settings.toml</code> の <code>[env]</code> で変えられます。</div>';
 }
-$('gear').onclick = () => { if (D) openSettings(); };
 $('sheet').addEventListener('click', (e) => { if (e.target === $('sheet')) closeSheet(); });
 document.addEventListener('click', async (e) => {
   const a = e.target.closest('[data-act]');
@@ -533,14 +635,24 @@ document.addEventListener('click', async (e) => {
     if (act === 'envalert') {
       try {
         await post('/api/settings', { env_alert: !D.env.alert });
-        await refresh(); openSettings();
+        await refresh();
         toast('お部屋の通知を' + (D.env.alert ? 'オン' : 'オフ') + 'にしました');
       } catch (err) { toast(err.message); }
+      return;
+    }
+    if (['milk', 'feedstart', 'feedlater', 'fminus', 'fplus', 'feedcancel', 'feedfinish'].includes(act)) {
+      try { await feedAct(act); } catch (err) { toast(err.message); }
       return;
     }
     if (act === 'nocam') { toast('カメラは家のWi-Fiにつないだときだけ見られます'); return; }
     if (act === 'close') closeSheet(); else if (act === 'menu') openMenu(); else if (act === 'diaper') openDiaper(); else if (act === 'weight') openWeight();
     return; }
+  const st = e.target.closest('[data-step]');
+  if (st) {
+    const c = mcfg(), k = st.dataset.step, step = k === 'breast' ? (c.breast_step_ml || 5) : c.step_ml;
+    feed[k] = Math.max(0, Math.min(c.max_ml, feed[k] + Number(st.dataset.d) * step)); feed.edited = true; renderFeed();
+    return;
+  }
   const ag = e.target.closest('[data-ago]');
   if (ag) { diaperAgo = Number(ag.dataset.ago); openDiaper(); return; }
   const b = e.target.closest('[data-diaper]');
@@ -591,13 +703,18 @@ async function post(path, body) {
   if (!r.ok || !j.ok) throw new Error(j.error || 'うまく記録できませんでした');
   return j;
 }
-function toast(msg, id) {
-  $('tmsg').textContent = msg; undoId = id || null; $('tundo').style.display = id ? '' : 'none'; $('toast').style.display = 'flex';
+let undoKind = 'diaper';
+function toast(msg, id, kind) {
+  $('tmsg').textContent = msg; undoId = id || null; undoKind = kind || 'diaper'; $('tundo').style.display = id ? '' : 'none'; $('toast').style.display = 'flex';
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('toast').style.display = 'none'; undoId = null; }, 10000);
 }
 $('tundo').onclick = async () => {
   if (!undoId) return;
-  try { const j = await post('/api/diaper/undo', { id: undoId }); D = j; renderAll(); toast('取り消しました'); } catch (err) { toast(err.message); }
+  try {
+    if (undoKind === 'feed') {
+      await post('/api/feed/undo', { id: undoId }); feed.mode = 'open'; feed.adj = 0; feed.edited = true; await refresh(); openMilk(); toast('取り消しました。量を直して記録し直せます');
+    } else { const j = await post('/api/diaper/undo', { id: undoId }); D = j; renderAll(); toast('取り消しました'); }
+  } catch (err) { toast(err.message); }
 };
 function tick() { const d = new Date(); $('clock').textContent = d.getHours() + ':' + two(d.getMinutes()); }
 tick(); setInterval(tick, 10000);

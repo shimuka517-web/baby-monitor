@@ -745,6 +745,7 @@ class Handler(server.BaseHTTPRequestHandler):
         return {
             "baby": {"name": b["name"], "birth_date": b["birth_date"], "days": days, "milestone": ms},
             "milk": MILK.summary() if MILK else None,
+            "milk_config": cfg.s["milk"],
             "diaper": LOGBOOK.diaper_summary() if LOGBOOK else None,
             "weights": LOGBOOK.weights() if LOGBOOK else [],
             "env": env,
