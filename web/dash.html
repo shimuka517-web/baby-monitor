@@ -205,7 +205,15 @@
   .lastfeed { margin-top: 12px; font-size: 13px; color: var(--sub); font-weight: 700; text-align: center; }
   .gear { width: 40px; height: 40px; border-radius: 14px; border: 0; background: var(--card); box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center; padding: 0; }
   .gear svg { width: 22px; height: 22px; }
-  #setCard .setrow { box-shadow: none; background: var(--soft, var(--bg)); }
+  #setCard { padding: 0; overflow: hidden; }
+  .setentry { width: 100%; display: flex; align-items: center; gap: 12px; padding: 16px; border: 0; background: none; text-align: left; }
+  .setentry .gi { width: 40px; height: 40px; border-radius: 14px; background: var(--bg); display: flex; align-items: center; justify-content: center; flex: none; color: var(--sub); }
+  .setentry .gi svg { width: 22px; height: 22px; }
+  .setentry .tx { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .setentry b { font-size: 16px; font-weight: 900; }
+  .setentry .tx span { font-size: 12.5px; color: var(--sub); font-weight: 700; }
+  .setentry .chev { font-size: 28px; color: var(--sub); line-height: 1; }
+  #panel .setrow { box-shadow: var(--shadow); }
   .setrow { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: 18px; padding: 14px; box-shadow: var(--shadow); }
   .setrow .tx { flex: 1; min-width: 0; }
   .setrow b { display: block; font-size: 16px; font-weight: 900; }
@@ -638,13 +646,24 @@ async function initPush() {
     if (!j.available && !PS.reason) PS.reason = 'server';
   } catch (e) { if (!PS.reason) PS.reason = 'server'; }
   PS.ready = true;
-  if (D) renderSettings();
+  if (D) refreshSettingsSheet();
 }
 function sw(act, on, label) { return '<button class="sw' + (on ? ' on' : '') + '" data-act="' + act + '" role="switch" aria-checked="' + on + '" aria-label="' + label + '"></button>'; }
 function row(title, sub, act, on) { return '<div class="setrow"><div class="tx"><b>' + title + '</b>' + (sub ? '<span>' + sub + '</span>' : '') + '</div>' + sw(act, on, title) + '</div>'; }
+const GEAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
+// いちばん下の「設定」の入口（押すと設定の画面へ）
 function renderSettings() {
+  const me = PS.info && PS.info.me;
+  const sub = PS.reason ? 'お部屋の通知・Discord' : (me ? 'このスマホに通知：オン' : 'アプリの通知・お部屋・Discord');
+  $('setCard').innerHTML = '<button class="setentry" data-act="settings"><span class="gi">' + GEAR + '</span><span class="tx"><b>設定</b><span>' + sub + '</span></span><span class="chev">›</span></button>';
+}
+function refreshSettingsSheet() {
+  renderSettings();
+  if (sheetView === 'settings') { const y = $('panel').scrollTop; openSettings(); $('panel').scrollTop = y; }
+}
+function openSettings() {
   const e = D.env, r = e.range, me = PS.info && PS.info.me;
-  let h = '<div class="ch"><span style="width:22px;height:22px;color:var(--sub)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></span>設定</div>';
+  let h = '<div class="ph"><b id="ptitle">設定</b><button data-act="close">とじる</button></div>';
   // このスマホへのアプリ通知
   h += '<div class="lbl" style="margin:6px 2px">このスマホに通知（アプリ）</div>';
   if (!PS.ready) h += '<div class="setnote">確認中…</div>';
@@ -670,7 +689,7 @@ function renderSettings() {
   h += '<div class="lbl" style="margin:14px 2px 6px">お部屋</div>' +
     row('「暑い・寒い」を知らせる', 'オフにすると、アプリにも Discord にも送りません（画面の表示とグラフはそのまま）', 'envalert', !!e.alert) +
     '<div class="setnote">目安の温度・湿度は、ラズパイの <code>config/settings.toml</code> の <code>[env]</code> で変えられます。起動・異常などのお知らせは、これまでどおり Discord に届きます。</div>';
-  $('setCard').innerHTML = h;
+  openSheet(h, 'settings');
 }
 async function pushAct(act) {
   if (act === 'pushon') {
@@ -696,16 +715,17 @@ async function pushAct(act) {
     toast('Discord への' + (k === 'discord_alert' ? '見守りアラート' : 'お部屋の通知') + 'を' + (v ? 'オン' : 'オフ') + 'にしました');
   }
   if (PS.info && PS.info.routes) PS.routes = PS.info.routes;
-  renderSettings();
+  refreshSettingsSheet();
 }
 $('sheet').addEventListener('click', (e) => { if (e.target === $('sheet')) closeSheet(); });
 document.addEventListener('click', async (e) => {
   const a = e.target.closest('[data-act]');
   if (a) { const act = a.dataset.act;
+    if (act === 'settings') { openSettings(); return; }
     if (act === 'envalert') {
       try {
         await post('/api/settings', { env_alert: !D.env.alert });
-        await refresh();
+        await refresh(); refreshSettingsSheet();
         toast('お部屋の通知を' + (D.env.alert ? 'オン' : 'オフ') + 'にしました');
       } catch (err) { toast(err.message); }
       return;
