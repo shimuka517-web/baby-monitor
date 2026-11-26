@@ -29,6 +29,39 @@ SHEETS = {
 ENV_KEEP_DAYS = 30
 
 
+def _month_day(y, m, d):
+    """y年m月のd日（その月にd日がなければ月末）"""
+    import calendar
+    return date(y, m, min(d, calendar.monthrange(y, m)[1]))
+
+
+def milestone_on(birth, day):
+    """その日が記念日なら名前を返す（なければ None）。「○日目」は生まれた日を1日目として数える"""
+    if day <= birth:
+        return None
+    nth = (day - birth).days + 1
+    months = (day.year - birth.year) * 12 + day.month - birth.month
+    if months >= 1 and day == _month_day(day.year, day.month, birth.day):
+        return f"{months // 12}歳のお誕生日" if months % 12 == 0 else f"生後{months}か月"
+    special = {7: "お七夜（7日目）", 100: "100日目（お食い初め）"}
+    if nth in special:
+        return special[nth]
+    if nth % 100 == 0:
+        return f"{nth}日目"
+    return None
+
+
+def milestones(birth, today, look_ahead=7):
+    """今日の記念日と、近いうちの次の記念日（look_ahead 日以内）"""
+    nxt = None
+    for k in range(1, look_ahead + 1):
+        label = milestone_on(birth, today + timedelta(days=k))
+        if label:
+            nxt = {"label": label, "in_days": k}
+            break
+    return {"today": milestone_on(birth, today), "next": nxt}
+
+
 class Logbook:
     def __init__(self, db_path, sender=None, retry_sec=60, clock=now_local):
         os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)

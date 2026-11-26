@@ -166,6 +166,14 @@
     font-size: 15px; font-weight: 700; box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: calc(100% - 28px); white-space: nowrap; }
   #toast button { border: 0; border-radius: 12px; padding: 8px 12px; background: var(--bg); color: var(--ink); font-weight: 900; font-size: 14px; }
   #offline { display: none; }
+  .party { position: relative; overflow: hidden; display: flex; align-items: center; gap: 12px; margin: 0 0 12px; padding: 14px 16px; border-radius: 22px;
+    background: linear-gradient(120deg, #FFD6E0, #FFE9B8 55%, #D8F3E6); color: #8A3B4F; box-shadow: var(--shadow); }
+  .party b { font-size: 20px; font-weight: 900; display: block; }
+  .party span { font-size: 13px; font-weight: 700; }
+  .party svg.cf { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: .7; }
+  .party .pi { width: 44px; height: 44px; flex: none; position: relative; }
+  .soon { display: inline-block; margin-top: 2px; padding: 2px 8px; border-radius: 999px; background: var(--milk-bg); color: var(--milk-ink); font-size: 11.5px; font-weight: 900; }
+  .mi.off { opacity: .55; }
   .foot { margin-top: 16px; text-align: center; font-size: 11px; color: var(--sub); }
 </style>
 </head>
@@ -179,6 +187,7 @@
       <span id="clock">--:--</span>
     </div>
   </header>
+  <div id="party"></div>
   <div class="msg warn" id="offline">ラズパイにつながりません。家のWi-Fiか Tailscale がオンか確認してください。</div>
 
   <!-- ひと目で分かるタイル（押すと下の詳しい表示へ） -->
@@ -211,6 +220,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 let D = null, undoId = null, toastTimer = null, diaperAgo = 0;
+let camLink = null, lanChecked = '';   // カメラ：家のWi-Fiにいるときだけリンク
 const SOURCE = ['localhost', '127.0.0.1'].includes(location.hostname) ? 'ベッド横の画面' : 'スマホ・PC';
 const two = (n) => String(n).padStart(2, '0');
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -278,8 +288,8 @@ function envState() {
   const e = D.env;
   if (!e.latest) return { out: false, msgs: [] };
   const r = e.range, t = e.latest.temp, h = e.latest.hum, msgs = [];
-  if (t < r.temp_min) msgs.push('室温が低め'); if (t > r.temp_max) msgs.push('室温が高め');
-  if (h < r.hum_min) msgs.push('乾燥ぎみ'); if (h > r.hum_max) msgs.push('湿度が高め');
+  if (t < r.temp_min) msgs.push('寒い'); if (t > r.temp_max) msgs.push('暑い');
+  if (h < r.hum_min) msgs.push('乾燥'); if (h > r.hum_max) msgs.push('じめじめ');
   return { out: msgs.length > 0, msgs };
 }
 function renderTiles() {
@@ -303,7 +313,7 @@ function renderTiles() {
   // 部屋
   if (e.latest) {
     t.push('<a class="tile room' + (es.out ? ' alert' : '') + '" href="#roomCard"><div class="tt">' + IC.home + 'おへや</div>' +
-      (es.out ? '<span class="badge warn">' + es.msgs[0] + '</span>' : '<span class="badge">ちょうどいい</span>') +
+      (es.out ? '<span class="badge warn">' + es.msgs.join('・') + '</span>' : '<span class="badge">ちょうどいい</span>') +
       '<div class="v" style="margin-top:6px"><b>' + e.latest.temp.toFixed(1) + '</b>℃</div><div class="v"><b style="font-size:22px">' + Math.round(e.latest.hum) + '</b>%</div>' +
       spark(e.series.slice(-24).map((p) => p.temp), 'var(--room)') + '</a>');
   } else {
@@ -374,7 +384,8 @@ function renderRoom() {
       'SwitchBot が未設定です。<code>config/secrets.toml</code> の <code>[switchbot]</code> にトークンとシークレットを入れて再起動してください（docs/home.md）。') + '</div>';
     return;
   }
-  h += es.out ? '<div class="msg warn">' + es.msgs.join('・') + '（目安 ' + r.temp_min + '〜' + r.temp_max + '℃・' + r.hum_min + '〜' + r.hum_max + '%）</div>'
+  const say = { '寒い': '寒いです', '暑い': '暑いです', '乾燥': '乾燥しています', 'じめじめ': 'じめじめしています' };
+  h += es.out ? '<div class="msg warn">' + es.msgs.map((x) => say[x]).join('・') + '（目安 ' + r.temp_min + '〜' + r.temp_max + '℃・' + r.hum_min + '〜' + r.hum_max + '%）</div>'
     : '<div class="msg ok">ちょうどいい範囲です（' + r.temp_min + '〜' + r.temp_max + '℃・' + r.hum_min + '〜' + r.hum_max + '%）</div>';
   const now = Date.now(), xmin = now - 24 * 3600e3, ticks = [];
   for (let k = 0; k <= 4; k++) { const x = xmin + k * 6 * 3600e3; ticks.push([x, k === 4 ? '今' : new Date(x).getHours() + '時']); }
@@ -430,17 +441,32 @@ function renderLog() {
   }).join('') + '</div>';
   $('logCard').innerHTML = h;
 }
+function confetti() {
+  const cols = ['#FF8E8E', '#F2B632', '#4FBF95', '#5AA9E6', '#9B83E8'];
+  let s = '<svg class="cf" viewBox="0 0 300 80" preserveAspectRatio="none" aria-hidden="true">';
+  for (let i = 0; i < 26; i++) {
+    const x = (i * 53) % 300, y = (i * 29) % 80, c = cols[i % 5], r = (i * 37) % 180;
+    s += i % 3 ? '<rect x="' + x + '" y="' + y + '" width="6" height="3" rx="1" fill="' + c + '" transform="rotate(' + r + ' ' + x + ' ' + y + ')"/>' : '<circle cx="' + x + '" cy="' + y + '" r="2.2" fill="' + c + '"/>';
+  }
+  return s + '</svg>';
+}
 function renderHeader() {
   const b = D.baby;
   $('bname').textContent = b.name || '育児の記録';
+  const ms = b.milestone || {};
   if (b.days != null && b.days >= 0) {
     const months = Math.floor(b.days / 30.44);
-    $('bdays').textContent = '生後 ' + b.days + '日' + (months >= 1 ? '（' + months + 'か月）' : '');
+    $('bdays').innerHTML = '生後 ' + b.days + '日' + (months >= 1 ? '（' + months + 'か月）' : '') +
+      (!ms.today && ms.next && ms.next.in_days <= 3 ? '<br><span class="soon">あと' + ms.next.in_days + '日で ' + esc(ms.next.label) + '</span>' : '');
   } else $('bdays').textContent = '';
+  $('party').innerHTML = ms.today ? '<div class="party">' + confetti() +
+    '<svg class="pi" viewBox="0 0 48 48" aria-hidden="true"><path d="M6 44 18 14l16 16z" fill="#FF8E8E"/><path d="M10 34l6 6M13 26l10 10" stroke="#FFF" stroke-width="2.5" stroke-linecap="round"/><circle cx="30" cy="10" r="3" fill="#F2B632"/><circle cx="40" cy="20" r="2.5" fill="#4FBF95"/><circle cx="38" cy="7" r="2" fill="#9B83E8"/><path d="M24 6c2 3 1 5-1 7M42 28c-3 1-5 0-6-2" stroke="#5AA9E6" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>' +
+    '<div style="position:relative"><b>今日で ' + esc(ms.today) + '！</b><span>おめでとうございます。記念の写真を撮っておきましょう</span></div></div>' : '';
   const m = D.monitor, map = { WATCHING: ['見守り中', m.face_visible ? 'var(--room)' : 'var(--sum)'], WAITING: ['確認中', 'var(--dia)'],
     ALERT: ['アラート', 'var(--warn)'], PAUSED: ['一時停止', 'var(--sub)'], NO_CAMERA: ['カメラなし', 'var(--sub)'] };
   const [t, col] = map[m.phase] || ['見守り', 'var(--sub)'];
   $('mon').innerHTML = '<i style="background:' + col + '"></i><span>' + t + '</span>';
+  $('mon').href = camLink || '#';
 }
 function renderAll() {
   if (!D) return;
@@ -459,7 +485,8 @@ function openMenu() {
     '<a class="mi milk" href="/milk">' + IC.milk + (o ? '授乳をおわる<small>' + o.time + ' から ' + o.elapsed_min + '分</small>' : 'ミルク・母乳<small>あげ始めに押す</small>') + '</a>' +
     '<button class="mi dia" data-act="diaper">' + IC.dia + 'おむつ<small>おしっこ・うんち</small></button>' +
     '<button class="mi wt" data-act="weight">' + IC.wt + 'たいじゅう<small>g で入れる</small></button>' +
-    '<a class="mi cam" href="/">' + IC.cam + '見守りカメラ<small>家の中・Tailscale</small></a></div>', 'menu');
+    (camLink ? '<a class="mi cam" href="' + camLink + '">' + IC.cam + '見守りカメラ<small>家のWi-Fi</small></a>'
+             : '<button class="mi cam off" data-act="nocam">' + IC.cam + '見守りカメラ<small>家のWi-Fiで見られます</small></button>') + '</div>', 'menu');
 }
 function openDiaper() {
   const agoBtns = [[0, 'いま'], [10, '10分前'], [30, '30分前'], [60, '1時間前']].map(([v, t]) => '<button data-ago="' + v + '" class="' + (v === diaperAgo ? 'on' : '') + '">' + t + '</button>').join('');
@@ -483,6 +510,7 @@ $('sheet').addEventListener('click', (e) => { if (e.target === $('sheet')) close
 document.addEventListener('click', async (e) => {
   const a = e.target.closest('[data-act]');
   if (a) { const act = a.dataset.act;
+    if (act === 'nocam') { toast('カメラは家のWi-Fiにつないだときだけ見られます'); return; }
     if (act === 'close') closeSheet(); else if (act === 'menu') openMenu(); else if (act === 'diaper') openDiaper(); else if (act === 'weight') openWeight();
     return; }
   const ag = e.target.closest('[data-ago]');
@@ -510,9 +538,25 @@ document.addEventListener('submit', async (e) => {
 
 /* ---------- 通信 ---------- */
 async function refresh() {
-  try { const r = await fetch('/api/dash', { cache: 'no-store' }); D = await r.json(); $('offline').style.display = 'none'; renderAll(); }
+  try { const r = await fetch('/api/dash', { cache: 'no-store' }); D = await r.json(); $('offline').style.display = 'none'; await checkCamera(); renderAll(); }
   catch (e) { $('offline').style.display = 'block'; }
 }
+// いま家のWi-Fiにいるか：このページを家のアドレスで開いていればそのまま。
+// Tailscale で開いているときは、家のアドレスに小さな確認を送って、届けば家にいると判断する
+async function checkCamera() {
+  const c = D.camera || {};
+  if (c.here) { camLink = '/'; return; }
+  const key = c.lan_url + '|' + Math.floor(Date.now() / 60000);
+  if (!c.lan_url || lanChecked === key) return;
+  lanChecked = key;
+  try {
+    const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 1500);
+    const r = await fetch(c.lan_url + '/api/lan', { cache: 'no-store', signal: ctl.signal });
+    clearTimeout(tm);
+    camLink = r.ok ? c.lan_url + '/' : null;
+  } catch (e) { camLink = null; }
+}
+$('mon').addEventListener('click', (e) => { if (!camLink) { e.preventDefault(); toast('カメラは家のWi-Fiにつないだときだけ見られます'); } });
 async function post(path, body) {
   const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: SOURCE, ...body }) });
   const j = await r.json();

@@ -184,8 +184,34 @@ class TestEnvAlert(unittest.TestCase):
         for _ in range(3):
             m.poll_once()
         self.assertEqual(len(msgs), 2)
-        self.assertIn("室温が高く", msgs[0])
-        self.assertIn("湿度が低く", msgs[1])
+        self.assertIn("暑く", msgs[0])
+        self.assertIn("乾燥", msgs[1])
+
+
+class TestMilestones(unittest.TestCase):
+    def test_days(self):
+        from datetime import date
+        b = date(2026, 11, 14)
+        self.assertEqual(logbook.milestone_on(b, date(2026, 11, 20)), "お七夜（7日目）")
+        self.assertEqual(logbook.milestone_on(b, date(2026, 12, 14)), "生後1か月")
+        self.assertEqual(logbook.milestone_on(b, date(2027, 2, 21)), "100日目（お食い初め）")
+        self.assertEqual(logbook.milestone_on(b, date(2027, 11, 14)), "1歳のお誕生日")
+        self.assertIsNone(logbook.milestone_on(b, date(2026, 11, 26)))
+        m = logbook.milestones(b, date(2026, 12, 11))
+        self.assertEqual((m["today"], m["next"]), (None, {"label": "生後1か月", "in_days": 3}))
+
+    def test_month_end(self):
+        from datetime import date
+        b = date(2026, 1, 31)
+        self.assertEqual(logbook.milestone_on(b, date(2026, 2, 28)), "生後1か月")   # 2月は月末
+
+
+class TestHomeNetwork(unittest.TestCase):
+    def test_lan_vs_tailscale(self):
+        import baby_monitor as bm
+        for ip, home in (("192.168.10.20", True), ("10.0.0.5", True), ("127.0.0.1", True), ("::1", True),
+                         ("100.101.2.3", False), ("fd7a:115c:a1e0::5", False), ("8.8.8.8", False), ("::ffff:192.168.1.2", True)):
+            self.assertEqual(bm.is_home_network(ip), home, ip)
 
 
 class TestWeather(unittest.TestCase):

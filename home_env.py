@@ -111,15 +111,16 @@ class EnvMonitor:
         self.logbook.add_env(temp, hum)
         c = self.get_cfg()
         if c.get("alert", True):
+            words = {"室温": ("寒く", "暑く"), "湿度": ("乾燥して", "じめじめして")}
             for al, v, lo, hi in ((self.temp_alert, temp, c["temp_min"], c["temp_max"]),
                                   (self.hum_alert, hum, c["hum_min"], c["hum_max"])):
                 ev = al.check(v, lo, hi)
-                if ev == "low":
-                    self.notify(f"🌡️ 部屋の{al.name}が低くなっています：{v:g}{al.unit}（目安 {lo:g}〜{hi:g}{al.unit}）")
-                elif ev == "high":
-                    self.notify(f"🌡️ 部屋の{al.name}が高くなっています：{v:g}{al.unit}（目安 {lo:g}〜{hi:g}{al.unit}）")
+                low, high = words[al.name]
+                if ev in ("low", "high"):
+                    w = low if ev == "low" else high
+                    self.notify(f"🌡️ お部屋が{w}います：{al.name} {v:g}{al.unit}（目安 {lo:g}〜{hi:g}{al.unit}）")
                 elif ev == "ok":
-                    self.notify(f"✅ 部屋の{al.name}が目安の範囲に戻りました：{v:g}{al.unit}")
+                    self.notify(f"✅ お部屋の{al.name}が目安の範囲に戻りました：{v:g}{al.unit}")
         return temp, hum
 
     def start(self):

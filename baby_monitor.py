@@ -58,12 +58,12 @@ DEFAULTS = {
     },
     "detection": {"score_threshold": 0.6, "try_rotations": True, "detect_width": 640},
     "camera": {"width": 1280, "height": 720, "rotate": 0},
-    "web": {"port": 8000, "jpeg_quality": 80},
+    "web": {"port": 8000, "jpeg_quality": 80, "camera_lan_only": True},
     "milk": {"default_ml": 100, "step_ml": 10, "breast_step_ml": 5, "max_ml": 300,
              "presets": [40, 60, 80, 100, 120, 160], "undo_sec": 10},
     "baby": {"birth_date": "", "name": ""},
     "env": {"enabled": True, "poll_sec": 300, "device_id": "", "alert": True,
-            "temp_min": 20.0, "temp_max": 26.0, "hum_min": 40.0, "hum_max": 60.0},
+            "temp_min": 20.0, "temp_max": 23.0, "hum_min": 40.0, "hum_max": 60.0},
     "weather": {"enabled": True, "latitude": 36.314, "longitude": 139.800, "place": "小山市"},
     "display": {"night_start": "21:00", "night_end": "07:00", "night_mode": "dim",
                 "brightness_day": 100, "brightness_night": 10, "wake_sec": 30},
@@ -462,6 +462,7 @@ class Backlight:
 
 
 BACKLIGHT = None   # Backlight（main() で用意）
+LAN_IP = ""        # ラズパイの家のLANでのIP（main() で調べる）
 LOGBOOK = None     # logbook.Logbook（おむつ・体重・温湿度）
 ENV = None         # home_env.EnvMonitor（SwitchBot）
 WEATHER = None     # home_env.Weather
@@ -505,6 +506,37 @@ def init_home():
 
 
 # ================================================================ Web配信
+# ================================================================ 家のネットワークかどうか（カメラは家の中だけ）
+import ipaddress
+import socket
+
+TAILSCALE_NETS = [ipaddress.ip_network("100.64.0.0/10"), ipaddress.ip_network("fd7a:115c:a1e0::/48")]
+
+
+def is_home_network(ip):
+    """家のLAN（192.168.x.x など）またはラズパイ自身なら True。Tailscale（100.64.0.0/10 など）やネットの向こうは False"""
+    try:
+        a = ipaddress.ip_address(ip.split("%")[0])
+    except ValueError:
+        return False
+    if getattr(a, "ipv4_mapped", None):
+        a = a.ipv4_mapped
+    if any(a in n for n in TAILSCALE_NETS):
+        return False
+    return a.is_loopback or a.is_private or a.is_link_local
+
+
+def lan_ip():
+    """ラズパイの家のLANでのIPアドレス（見つからなければ空）"""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sk:
+            sk.connect(("192.168.0.1", 9))   # 実際には送信しない。外向きのインターフェースを知るため
+            ip = sk.getsockname()[0]
+        return ip if is_home_network(ip) and not ipaddress.ip_address(ip).is_loopback else ""
+    except OSError:
+        return ""
+
+
 class Handler(server.BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass
@@ -529,11 +561,42 @@ class Handler(server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _client_ip(self):
+        ip = self.client_address[0]
+        # tailscale serve などの中継を通ったときは、元の相手のアドレスで判断する
+        fwd = self.headers.get("X-Forwarded-For")
+        if ipaddress.ip_address(ip.split("%")[0]).is_loopback and (fwd or self.headers.get("Tailscale-User-Login")):
+            return (fwd or "100.64.0.1").split(",")[0].strip()
+        return ip
+
+    def _at_home(self):
+        return is_home_network(self._client_ip())
+
+    def _camera_ok(self):
+        return not cfg.s["web"]["camera_lan_only"] or self._at_home()
+
     def do_GET(self):
         if not self._auth_ok():
             return
         path = self.path.split("?", 1)[0]
-        if path in ("/", "/index.html"):
+        if path in ("/", "/index.html") and not self._camera_ok():
+            self.send_response(302)                      # 外出先からはカメラの画面ではなくダッシュボードへ
+            self.send_header("Location", "/dash")
+            self.end_headers()
+        elif path in ("/stream.mjpg", "/snapshot.jpg") and not self._camera_ok():
+            self._send(403, "text/plain; charset=utf-8", "カメラは家のWi-Fiにつないだときだけ見られます".encode())
+        elif path == "/api/lan":
+            # ダッシュボードが「いま家のWi-Fiにいるか」を確かめるための窓口（家の中からだけ答える）
+            if self._at_home():
+                self.send_response(200)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(b'{"ok": true}')
+            else:
+                self._send(403, "application/json", b'{"ok": false}')
+        elif path in ("/", "/index.html"):
             self._file("index.html")
         elif path == "/milk":
             self._file("milk.html")
@@ -662,11 +725,14 @@ class Handler(server.BaseHTTPRequestHandler):
         from datetime import date as _date
         with shared.lock:
             st = dict(shared.status)
+        from logbook import milestones
         b = cfg.s["baby"]
-        days = None
+        days, ms = None, {"today": None, "next": None}
         try:
             if b["birth_date"]:
-                days = (_date.today() - _date.fromisoformat(b["birth_date"])).days
+                birth = _date.fromisoformat(b["birth_date"])
+                days = (_date.today() - birth).days
+                ms = milestones(birth, _date.today())
         except ValueError:
             pass
         env = LOGBOOK.env_summary() if LOGBOOK else {"latest": None, "series": [], "trend": None}
@@ -675,12 +741,13 @@ class Handler(server.BaseHTTPRequestHandler):
         env["configured"] = ENV is not None
         env["error"] = ENV.last_error if ENV else ""
         return {
-            "baby": {"name": b["name"], "birth_date": b["birth_date"], "days": days},
+            "baby": {"name": b["name"], "birth_date": b["birth_date"], "days": days, "milestone": ms},
             "milk": MILK.summary() if MILK else None,
             "diaper": LOGBOOK.diaper_summary() if LOGBOOK else None,
             "weights": LOGBOOK.weights() if LOGBOOK else [],
             "env": env,
             "weather": WEATHER.summary() if WEATHER else None,
+            "camera": {"here": self._camera_ok(), "lan_url": (f"http://{LAN_IP}:{cfg.s['web']['port']}" if LAN_IP else "")},
             "night": {"start": int(cfg.s["display"]["night_start"].split(":")[0]), "end": int(cfg.s["display"]["night_end"].split(":")[0])},
             "timeline": {"feeds": MILK.since(24) if MILK else [], "diapers": LOGBOOK.diapers_since(24) if LOGBOOK else []},
             "monitor": {"phase": st.get("phase"), "face_visible": st.get("face_visible"), "armed_sec": st.get("armed_sec")},
@@ -826,6 +893,10 @@ def main():
     BACKLIGHT = Backlight()
     log.info("液晶の明るさ調整: %s", "使えます" if BACKLIGHT.writable else
              ("権限がありません（scripts/install-service.sh を再実行）" if BACKLIGHT.available else "対応する液晶なし"))
+    global LAN_IP
+    LAN_IP = lan_ip()
+    log.info("家のネットワークでのアドレス: %s（カメラは%s）", LAN_IP or "不明",
+             "家のWi-Fiからだけ" if cfg.s["web"]["camera_lan_only"] else "どこからでも")
     init_milk()
     init_home()
     httpd = StreamingServer(("", web_cfg["port"]), Handler)
