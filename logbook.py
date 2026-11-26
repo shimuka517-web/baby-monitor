@@ -127,6 +127,14 @@ class Logbook:
                         "kind": r["kind"], "label": DIAPER_KINDS[r["kind"]]} for r in today[:recent]],
         }
 
+    def diapers_since(self, hours=24):
+        since = (self.clock() - timedelta(hours=hours)).isoformat()
+        with self.lock, self._db() as c:
+            rows = [dict(r) for r in c.execute(
+                "SELECT id, ts, kind FROM diapers WHERE deleted=0 AND ts >= ? ORDER BY ts", (since,))]
+        return [{"id": r["id"], "ts": r["ts"], "time": datetime.fromisoformat(r["ts"]).strftime("%H:%M"),
+                 "kind": r["kind"], "label": DIAPER_KINDS[r["kind"]]} for r in rows]
+
     # ------------------------------------------------------------ 体重（1日1件。同じ日に入れ直したら上書き）
     def set_weight(self, grams, day=None, note=""):
         grams = int(grams)

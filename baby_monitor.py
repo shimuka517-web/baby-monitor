@@ -681,6 +681,8 @@ class Handler(server.BaseHTTPRequestHandler):
             "weights": LOGBOOK.weights() if LOGBOOK else [],
             "env": env,
             "weather": WEATHER.summary() if WEATHER else None,
+            "night": {"start": int(cfg.s["display"]["night_start"].split(":")[0]), "end": int(cfg.s["display"]["night_end"].split(":")[0])},
+            "timeline": {"feeds": MILK.since(24) if MILK else [], "diapers": LOGBOOK.diapers_since(24) if LOGBOOK else []},
             "monitor": {"phase": st.get("phase"), "face_visible": st.get("face_visible"), "armed_sec": st.get("armed_sec")},
             "pending": (LOGBOOK.pending() if LOGBOOK and LOGBOOK.sender else 0),
             "local": self.client_address[0] in ("127.0.0.1", "::1"),

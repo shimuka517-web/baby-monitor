@@ -215,6 +215,14 @@ class MilkLog:
             out["open"] = o
         return out
 
+    def since(self, hours=24):
+        """直近 hours 時間の授乳（授乳中も含む）。ダッシュボードのタイムライン用"""
+        since = (self.clock() - timedelta(hours=hours)).isoformat()
+        with self.lock, self._db() as c:
+            rows = [dict(r) for r in c.execute(
+                "SELECT * FROM feeds WHERE deleted=0 AND ts >= ? ORDER BY ts", (since,))]
+        return [self._public(r) for r in rows]
+
     # ------------------------------------------------------------ 送信
     def sync_once(self):
         """未送信の変更を古い順に送る。送れた件数を返す"""

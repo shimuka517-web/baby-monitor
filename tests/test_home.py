@@ -65,6 +65,13 @@ class TestLogbook(unittest.TestCase):
         self.assertEqual((s["last"]["time"], s["last"]["ago_text"]), ("11:00", "1時間前"))
         self.assertEqual(s["last_poo"]["time"], "09:30")
 
+    def test_diapers_since(self):
+        self.at(10, 0, d=25); self.lb.add_diaper("pee")
+        self.at(13, 0, d=25); self.lb.add_diaper("poo")
+        self.at(11, 0); self.lb.add_diaper("both")
+        self.at(12, 0)
+        self.assertEqual([r["kind"] for r in self.lb.diapers_since(24)], ["poo", "both"])
+
     def test_diaper_minutes_ago_and_invalid(self):
         r = self.lb.add_diaper("pee", minutes_ago=30)
         self.assertTrue(r["ts"].startswith("2026-11-26T11:30"))

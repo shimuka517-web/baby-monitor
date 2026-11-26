@@ -182,6 +182,13 @@ class TestMilk(unittest.TestCase):
         self.assertEqual(m.sync_once(), 1)
         self.assertEqual(list(self.sheet.rows), ["old2"])
 
+    def test_since_includes_open(self):
+        self.at(9, 0, d=17); self.m.add(milk=100)
+        self.at(8, 0); self.m.add(milk=80)
+        self.at(10, 0); self.m.start()
+        self.at(11, 0)
+        self.assertEqual([(r["time"], r["status"]) for r in self.m.since(24)], [("08:00", "done"), ("10:00", "open")])
+
     def test_ago_text(self):
         self.assertEqual(milk.ago_text(0), "たった今")
         self.assertEqual(milk.ago_text(45), "45分前")
