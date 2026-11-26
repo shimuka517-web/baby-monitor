@@ -74,6 +74,7 @@ UI_KEYS = {
     "night_mode": ("display", "night_mode", lambda v: v if v in ("dim", "off", "none") else None),
     "brightness_day": ("display", "brightness_day", lambda v: max(0, min(100, int(v)))),
     "brightness_night": ("display", "brightness_night", lambda v: max(0, min(100, int(v)))),
+    "env_alert": ("env", "alert", lambda v: v if isinstance(v, bool) else str(v).lower() in ("1", "true", "on")),
     "head": (None, "head", lambda v: (LEGACY_HEAD.get(v, v) if LEGACY_HEAD.get(v, v) in HEAD_ROTATE else None)),
 }
 # 赤ちゃんの頭の向き（カメラの側から見て）→ 映像を回す角度（時計回り）
@@ -738,6 +739,7 @@ class Handler(server.BaseHTTPRequestHandler):
         env = LOGBOOK.env_summary() if LOGBOOK else {"latest": None, "series": [], "trend": None}
         e = cfg.s["env"]
         env["range"] = {k: e[k] for k in ("temp_min", "temp_max", "hum_min", "hum_max")}
+        env["alert"] = e["alert"]
         env["configured"] = ENV is not None
         env["error"] = ENV.last_error if ENV else ""
         return {

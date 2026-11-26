@@ -68,6 +68,12 @@ class TestUiSettings(unittest.TestCase):
         with open(self.cfg.ui_path) as f:
             self.assertEqual(json.load(f)["absent_sec"], 30.0)
 
+    def test_env_alert_toggle(self):
+        self.assertEqual(self.cfg.set_ui({"env_alert": False}), {"env_alert": False})
+        self.assertFalse(self.cfg.s["env"]["alert"])
+        self.cfg.set_ui({"env_alert": "on"})
+        self.assertTrue(self.cfg.s["env"]["alert"])
+
     def test_old_head_values(self):
         self.assertEqual(self.cfg.set_ui({"head": "opposite"}), {"head": "near"})
         self.assertEqual(self.cfg.set_ui({"head": "camera"}), {"head": "far"})

@@ -174,6 +174,17 @@
   .party .pi { width: 44px; height: 44px; flex: none; position: relative; }
   .soon { display: inline-block; margin-top: 2px; padding: 2px 8px; border-radius: 999px; background: var(--milk-bg); color: var(--milk-ink); font-size: 11.5px; font-weight: 900; }
   .mi.off { opacity: .55; }
+  .gear { width: 40px; height: 40px; border-radius: 14px; border: 0; background: var(--card); box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center; padding: 0; }
+  .gear svg { width: 22px; height: 22px; }
+  .setrow { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: 18px; padding: 14px; box-shadow: var(--shadow); }
+  .setrow .tx { flex: 1; min-width: 0; }
+  .setrow b { display: block; font-size: 16px; font-weight: 900; }
+  .setrow span { font-size: 12.5px; color: var(--sub); font-weight: 700; line-height: 1.5; }
+  .sw { width: 64px; height: 36px; border-radius: 18px; border: 0; background: var(--line); position: relative; flex: none; padding: 0; transition: background .2s; }
+  .sw::after { content: ""; position: absolute; top: 4px; left: 4px; width: 28px; height: 28px; border-radius: 14px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); transition: left .2s; }
+  .sw.on { background: var(--room); }
+  .sw.on::after { left: 32px; }
+  .setnote { font-size: 12px; color: var(--sub); line-height: 1.6; margin-top: 10px; padding: 0 4px; }
   .foot { margin-top: 16px; text-align: center; font-size: 11px; color: var(--sub); }
 </style>
 </head>
@@ -185,6 +196,7 @@
     <div class="hright">
       <a class="chip" id="mon" href="/"><i></i><span>見守り</span></a>
       <span id="clock">--:--</span>
+      <button class="gear" id="gear" aria-label="設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
     </div>
   </header>
   <div id="party"></div>
@@ -506,10 +518,26 @@ function openWeight() {
   setTimeout(() => $('wgrams') && $('wgrams').focus(), 250);
 }
 $('fab').onclick = openMenu;
+function openSettings() {
+  const e = D.env, r = e.range, on = !!e.alert;
+  openSheet('<div class="ph"><b id="ptitle">設定</b><button data-act="close">とじる</button></div>' +
+    '<div class="setrow"><div class="tx"><b>お部屋の「暑い・寒い」通知</b><span>室温 ' + r.temp_min + '〜' + r.temp_max + '℃・湿度 ' + r.hum_min + '〜' + r.hum_max + '% を外れたら Discord に知らせます</span></div>' +
+    '<button class="sw' + (on ? ' on' : '') + '" data-act="envalert" role="switch" aria-checked="' + on + '" aria-label="お部屋の通知"></button></div>' +
+    '<div class="setnote">オフにしても、画面の「暑い」「寒い」の表示とグラフはそのまま出ます。<br>目安の温度・湿度は、ラズパイの <code>config/settings.toml</code> の <code>[env]</code> で変えられます。</div>', 'settings');
+}
+$('gear').onclick = () => { if (D) openSettings(); };
 $('sheet').addEventListener('click', (e) => { if (e.target === $('sheet')) closeSheet(); });
 document.addEventListener('click', async (e) => {
   const a = e.target.closest('[data-act]');
   if (a) { const act = a.dataset.act;
+    if (act === 'envalert') {
+      try {
+        await post('/api/settings', { env_alert: !D.env.alert });
+        await refresh(); openSettings();
+        toast('お部屋の通知を' + (D.env.alert ? 'オン' : 'オフ') + 'にしました');
+      } catch (err) { toast(err.message); }
+      return;
+    }
     if (act === 'nocam') { toast('カメラは家のWi-Fiにつないだときだけ見られます'); return; }
     if (act === 'close') closeSheet(); else if (act === 'menu') openMenu(); else if (act === 'diaper') openDiaper(); else if (act === 'weight') openWeight();
     return; }
