@@ -26,7 +26,8 @@ def _b64(raw):
 
 
 class Push:
-    def __init__(self, data_dir, contact="mailto:baby-monitor@localhost", sender=None):
+    # 通知サーバーに名乗る連絡先。Apple は localhost などの仮の宛先を受け付けないので、https のURLにする
+    def __init__(self, data_dir, contact="https://github.com/shimuka517-web/baby-monitor", sender=None):
         self.data_dir = data_dir
         self.key_path = os.path.join(data_dir, "vapid_private.pem")
         self.subs_path = os.path.join(data_dir, "push.json")
@@ -34,6 +35,7 @@ class Push:
         self.lock = threading.RLock()
         self.public_key = ""
         self.error = ""
+        self.last_error = ""
         self._send = sender          # テスト用：sender(sub, payload_str) -> status_code
         try:
             self._load_or_create_key()
@@ -132,9 +134,12 @@ class Push:
             try:
                 code = self._send(s, payload) if self._send else self._webpush(s, payload)
             except Exception as e:
-                code = getattr(getattr(e, "response", None), "status_code", None)
+                resp = getattr(e, "response", None)
+                code = getattr(resp, "status_code", None)
                 if code not in (404, 410):
-                    log.warning("アプリ通知を送れませんでした: %s", e)
+                    detail = (getattr(resp, "text", "") or "")[:200]
+                    self.last_error = f"{code or ''} {detail or e}".strip()
+                    log.warning("アプリ通知を送れませんでした（%s）: %s", s.get("endpoint", "")[:40], self.last_error)
             if code in (404, 410):
                 gone.append(s["endpoint"])          # アプリを消した・通知を切ったスマホ
             elif code and 200 <= code < 300:

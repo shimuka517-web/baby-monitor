@@ -705,7 +705,8 @@ async function pushAct(act) {
     await PS.sub.unsubscribe().catch(() => {}); PS.sub = null; toast('このスマホへの通知をやめました');
   } else if (act === 'pushtest') {
     const j = await post('/api/push/test', { endpoint: PS.sub.endpoint });
-    toast(j.sent ? 'テスト通知を送りました' : '送れませんでした。もう一度「通知を受け取る」からやり直してください');
+    if (j.sent) toast('テスト通知を送りました');
+    else alert('送れませんでした。\n' + (j.error ? '理由：' + j.error + '\n' : '') + '「このスマホはやめる」→「このスマホで通知を受け取る」でやり直すと直ることがあります。');
   } else if (act === 'pk-alert' || act === 'pk-env') {
     const k = act.slice(3), me = PS.info.me;
     PS.info = await post('/api/push/update', { endpoint: PS.sub.endpoint, kinds: { [k]: !me.kinds[k] } });

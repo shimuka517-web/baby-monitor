@@ -756,8 +756,9 @@ class Handler(server.BaseHTTPRequestHandler):
                 elif self.path == "/api/push/unsubscribe":
                     PUSH.unsubscribe(ep); out = PUSH.public_info()
                 elif self.path == "/api/push/test":
+                    PUSH.last_error = ""
                     n = PUSH.send("test", "テスト通知", "アプリの通知はこのように届きます", url="/dash", only=ep)
-                    out = {**PUSH.public_info(ep), "sent": n}
+                    out = {**PUSH.public_info(ep), "sent": n, "error": PUSH.last_error}
                 else:
                     self._send(404, "text/plain", b"not found")
                     return
