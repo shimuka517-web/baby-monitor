@@ -12,3 +12,4 @@ __pycache__/
 *.jpg
 *.png
 !docs/images/*.png
+!web/*.png
